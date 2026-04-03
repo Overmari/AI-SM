@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scrum Master AI — полная версия</title>
+    <title>Scrum Master AI — правильная скорость по Done</title>
     <style>
         * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
         body { background: #f1f5f9; margin: 0; padding: 20px; }
@@ -41,7 +41,7 @@
 </head>
 <body>
 <div class="container">
-    <h1>🧠 Scrum Master AI <span style="font-size:0.8rem;background:#e2e8f0;padding:2px 12px;border-radius:40px;">аналитика команд + ИИ</span></h1>
+    <h1>🧠 Scrum Master AI <span style="font-size:0.8rem;background:#e2e8f0;padding:2px 12px;border-radius:40px;">скорость только по Done</span></h1>
     <div class="sub">⚡ DoD · Ретро · Отчёт CTO · 🔊 Немой наблюдатель · 📊 Сравнение CSV · 📈 Аналитика команд по 30 CSV</div>
 
     <div class="tabs">
@@ -61,7 +61,7 @@
             <button id="addTeamBtn">+ Добавить команду</button>
         </div>
         <div id="teamsList" class="team-grid"></div>
-        <div class="api-note">💾 Данные команд и загруженные CSV сохраняются в браузере. Для каждой команды можно загрузить до 30 CSV-файлов (спринтов).</div>
+        <div class="api-note">💾 Данные команд и загруженные CSV сохраняются в браузере. Для каждой команды можно загрузить до 30 CSV-файлов (спринтов). Скорость считается ТОЛЬКО по выполненным задачам (Done).</div>
     </div>
 
     <!-- DoD -->
@@ -123,11 +123,10 @@
     let teams = [];
 
     function loadTeams() {
-        const stored = localStorage.getItem('scrum_teams_v3');
+        const stored = localStorage.getItem('scrum_teams_v4');
         if(stored) {
             teams = JSON.parse(stored);
         } else {
-            // Стартовые команды
             teams = [
                 { id: 1, name: 'Alpha (бэкенд)', context: 'Java, микросервисы', csvData: [] },
                 { id: 2, name: 'Beta (фронтенд)', context: 'React, мобилка', csvData: [] },
@@ -141,12 +140,12 @@
     }
 
     function saveTeams() {
-        localStorage.setItem('scrum_teams_v3', JSON.stringify(teams));
+        localStorage.setItem('scrum_teams_v4', JSON.stringify(teams));
         renderTeams();
         updateSelects();
     }
 
-    // Парсинг CSV и вычисление метрик
+    // Парсинг CSV и вычисление метрик (скорость только по Done)
     function parseCSVMetrics(csvText, fileName) {
         const lines = csvText.split(/\r?\n/).filter(l => l.trim());
         if(lines.length < 2) return null;
@@ -181,7 +180,9 @@
             if(statusCol !== -1 && cols[statusCol]) {
                 let s = cols[statusCol].toLowerCase();
                 isDone = s.includes('done') || s.includes('closed') || s.includes('выполнен') || s.includes('закрыт') || s.includes('готов');
-            } else { isDone = true; }
+            } else {
+                isDone = true; // если нет статуса, считаем все выполненными
+            }
             if(isDone) {
                 doneTasks++;
                 doneSP += points;
@@ -199,15 +200,16 @@
             typeCounts[taskType] = (typeCounts[taskType] || 0) + 1;
         }
         const completionPercent = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
-        const velocitySP = totalSP;
-        const velocityTasks = totalTasks;
+        // Скорость = только выполненные задачи и SP
+        const velocitySP = doneSP;
+        const velocityTasks = doneTasks;
         return {
             fileName,
             date: new Date().toISOString(),
             totalTasks, doneTasks, totalSP, doneSP,
             completionPercent,
-            velocitySP,
-            velocityTasks,
+            velocitySP,      // выполненные SP
+            velocityTasks,   // выполненные задачи
             typeCounts
         };
     }
@@ -280,7 +282,7 @@
                     <p><strong>📊 Аналитика по ${filesCount} загруженным спринтам:</strong></p>
                     <p>📌 Распределение типов: ${typeHtml}</p>
                     <p>✅ Процент выполненных задач: <strong>${percentDone}%</strong> (средний)</p>
-                    <p>⚡ Средняя скорость: <strong>${avgSP} SP</strong> / спринт | <strong>${avgTasks} задач</strong> / спринт</p>
+                    <p>⚡ Средняя скорость (только Done): <strong>${avgSP} SP</strong> / спринт | <strong>${avgTasks} задач</strong> / спринт</p>
                 </div>
                 <div class="flex-row" style="margin-top: 12px;">
                     <button class="small" onclick="uploadCSVForTeam(${team.id})">📊 Загрузить CSV (спринт)</button>
@@ -329,7 +331,7 @@
         }
         let modalHtml = `<div class="overlay" onclick="closeModal()"></div><div class="file-list-modal"><h4>История CSV для ${escapeHtml(team.name)}</h4><ul>`;
         team.csvData.forEach((item, idx) => {
-            modalHtml += `<li><strong>${escapeHtml(item.fileName)}</strong> (${new Date(item.date).toLocaleDateString()}) — задачи: ${item.totalTasks}, выполнено: ${item.doneTasks} (${item.completionPercent}%), SP: ${item.totalSP} <button class="small danger" onclick="removeTeamCSV(${teamId}, ${idx})">Удалить</button></li>`;
+            modalHtml += `<li><strong>${escapeHtml(item.fileName)}</strong> (${new Date(item.date).toLocaleDateString()}) — задачи: ${item.totalTasks}, выполнено: ${item.doneTasks} (${item.completionPercent}%), выполнено SP: ${item.doneSP} <button class="small danger" onclick="removeTeamCSV(${teamId}, ${idx})">Удалить</button></li>`;
         });
         modalHtml += `</ul><button onclick="closeModal()">Закрыть</button></div>`;
         const div = document.createElement('div');
@@ -471,18 +473,18 @@
         if(!uploadedFiles.length) return '❌ Нет файлов для сравнения.';
         if(uploadedFiles.length === 1) {
             let m = uploadedFiles[0].metrics;
-            return `📊 Анализ одного файла\n\nФайл: ${m.fileName}\nЗадач: ${m.totalTasks}\nSP всего: ${m.totalSP}\nВыполнено: ${m.doneSP}\nСкорость: ${m.completionPercent}%\nБагов: ${m.typeCounts.Bug || 0}`;
+            return `📊 Анализ одного файла\n\nФайл: ${m.fileName}\nЗадач: ${m.totalTasks}\nВыполнено задач: ${m.doneTasks}\nSP всего: ${m.totalSP}\nВыполнено SP: ${m.doneSP}\nПроцент выполнения: ${m.completionPercent}%\nБагов: ${m.typeCounts.Bug || 0}`;
         }
         let report = `📊 СРАВНЕНИЕ ${uploadedFiles.length} CSV\n\n`;
-        report += `┌──────────────────┬────────┬────────┬────────┬────────┬──────────┐\n`;
-        report += `│ Файл             │ Задач  │ ВсегоSP│ Выполн │ Скорость│ Баги     │\n`;
-        report += `├──────────────────┼────────┼────────┼────────┼────────┼──────────┤\n`;
+        report += `┌──────────────────┬────────┬──────────┬──────────┬────────────┬──────────┐\n`;
+        report += `│ Файл             │ Задач  │ Выполнено│ Всего SP │ Выполнено SP│ Баги     │\n`;
+        report += `├──────────────────┼────────┼──────────┼──────────┼────────────┼──────────┤\n`;
         for(let item of uploadedFiles) {
             let m = item.metrics;
             let nameShort = m.fileName.length>16 ? m.fileName.slice(0,13)+'...' : m.fileName.padEnd(16);
-            report += `│ ${nameShort} │ ${String(m.totalTasks).padEnd(6)} │ ${String(m.totalSP).padEnd(6)} │ ${String(m.doneSP).padEnd(6)} │ ${String(m.completionPercent).padEnd(6)}% │ ${m.typeCounts.Bug || 0}       │\n`;
+            report += `│ ${nameShort} │ ${String(m.totalTasks).padEnd(6)} │ ${String(m.doneTasks).padEnd(8)} │ ${String(m.totalSP).padEnd(8)} │ ${String(m.doneSP).padEnd(10)} │ ${m.typeCounts.Bug || 0}       │\n`;
         }
-        report += `└──────────────────┴────────┴────────┴────────┴────────┴──────────┘\n`;
+        report += `└──────────────────┴────────┴──────────┴──────────┴────────────┴──────────┘\n`;
         return report;
     }
     document.getElementById('compareAllBtn')?.addEventListener('click', ()=>{
