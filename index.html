@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scrum Master AI — аналитика команд по CSV</title>
+    <title>Scrum Master AI — полная версия</title>
     <style>
         * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
         body { background: #f1f5f9; margin: 0; padding: 20px; }
@@ -15,8 +15,8 @@
         .tab-btn.active { background: #3b82f6; color: white; }
         .tab-pane { display: none; background: white; border-radius: 24px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
         .tab-pane.active { display: block; }
-        .team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px,1fr)); gap: 20px; margin: 20px 0; }
-        .team-card { background: #f8fafc; border-radius: 20px; padding: 16px; border: 1px solid #e2e8f0; transition: 0.1s; }
+        .team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px,1fr)); gap: 20px; margin: 20px 0; }
+        .team-card { background: #f8fafc; border-radius: 20px; padding: 16px; border: 1px solid #e2e8f0; }
         .team-name { font-weight: 700; font-size: 1.2rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         button { background: #3b82f6; border: none; color: white; padding: 8px 14px; border-radius: 40px; font-weight: 500; cursor: pointer; margin: 4px; }
         button.secondary { background: #e2e8f0; color: #1e293b; }
@@ -30,6 +30,12 @@
         .api-note { background: #fef9c3; border-left: 6px solid #eab308; padding: 12px; border-radius: 16px; font-size: 0.85rem; margin: 10px 0; }
         .success { background: #dcfce7; border-left-color: #22c55e; }
         .flex-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+        .output { background: #f1f5f9; padding: 16px; border-radius: 20px; margin-top: 20px; white-space: pre-wrap; font-family: monospace; font-size: 0.9rem; max-height: 500px; overflow-y: auto; }
+        .file-list { background: #f8fafc; border-radius: 16px; padding: 16px; margin: 16px 0; }
+        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #e2e8f0; }
+        .chart-card { background: #f8fafc; border-radius: 20px; padding: 16px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        .chart-img { max-width: 100%; max-height: 200px; border-radius: 12px; margin-bottom: 12px; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 12px; margin-top: 12px; }
         hr { margin: 16px 0; }
     </style>
 </head>
@@ -48,7 +54,7 @@
         <button class="tab-btn" data-tab="charts">📊 Анализ графиков</button>
     </div>
 
-    <!-- Вкладка Команды (с аналитикой) -->
+    <!-- Команды -->
     <div id="teams" class="tab-pane active">
         <div class="flex-row" style="justify-content: space-between;">
             <h3>Мои команды</h3>
@@ -58,40 +64,76 @@
         <div class="api-note">💾 Данные команд и загруженные CSV сохраняются в браузере. Для каждой команды можно загрузить до 30 CSV-файлов (спринтов).</div>
     </div>
 
-    <!-- Остальные вкладки (DoD, Ретро, Отчёт CTO, Сравнение CSV, Немой наблюдатель, Анализ графиков) -->
-    <!-- Для краткости оставим их заглушками, но они будут полностью рабочими. Фактически ниже будет полный код из предыдущей версии. -->
-    <div id="dod" class="tab-pane"><h3>🧾 Definition of Done</h3><select id="dodTeamSelect"></select><input type="text" id="dodContext" placeholder="Контекст"><div class="flex-row"><button id="genDodBtn">✨ Сгенерировать DoD</button><button id="genDodLocalBtn" class="secondary">📄 Базовый</button></div><div id="dodOutput" class="output"></div></div>
-    <div id="retro" class="tab-pane"><h3>🔄 Ретроспектива</h3><select id="retroTeamSelect"></select><textarea id="retroProblem" rows="2" placeholder="Опишите проблему..."></textarea><div class="flex-row"><button id="genRetroBtn">📖 Сгенерировать</button><button id="genRetroLocalBtn" class="secondary">📋 Универсальный</button></div><div id="retroOutput" class="output"></div></div>
-    <div id="report" class="tab-pane"><h3>📑 Отчёт для CTO</h3><div class="flex-row"><button id="genReportBtn">📊 Сформировать</button><button id="copyReportBtn" class="secondary">📋 Копировать</button></div><div id="reportOutput" class="output"></div></div>
-    <div id="sprint" class="tab-pane"><h3>📊 Сравнительный анализ до 10 CSV</h3><input type="file" id="multiCsvFiles" accept=".csv" multiple><button id="clearAllFilesBtn" class="danger">🗑️ Очистить все</button><div id="filesList" class="file-list">📁 Нет файлов</div><div class="flex-row"><button id="compareAllBtn" class="success">🔍 Сравнить все</button><button id="compareExampleBtn" class="secondary">📋 Пример</button></div><div id="csvOutput" class="output"></div></div>
-    <div id="observer" class="tab-pane"><h3>🎙️ Немой наблюдатель</h3><textarea id="manualTranscript" rows="6" placeholder="Вставьте текст встречи..."></textarea><button id="analyzeTextBtn">🔍 Анализировать</button><div id="observerOutput" class="output"></div></div>
-    <div id="charts" class="tab-pane"><h3>📈 Анализ графиков</h3><input type="file" id="chartImages" accept="image/*" multiple><button id="clearChartsBtn" class="danger">🗑️ Очистить</button><div id="chartsContainer"></div><button id="compareChartsBtn" class="success">🔍 Сравнить графики</button><button id="chartsExampleBtn" class="secondary">📋 Пример</button><div id="chartsOutput" class="output"></div></div>
+    <!-- DoD -->
+    <div id="dod" class="tab-pane">
+        <h3>🧾 Definition of Done</h3>
+        <select id="dodTeamSelect"></select>
+        <input type="text" id="dodContext" placeholder="Контекст (микросервисы, React, data...)">
+        <div class="flex-row"><button id="genDodBtn">✨ Сгенерировать DoD</button><button id="genDodLocalBtn" class="secondary">📄 Базовый</button></div>
+        <div id="dodOutput" class="output"></div>
+    </div>
+
+    <!-- Ретро -->
+    <div id="retro" class="tab-pane">
+        <h3>🔄 Ретроспектива</h3>
+        <select id="retroTeamSelect"></select>
+        <textarea id="retroProblem" rows="2" placeholder="Опишите проблему..."></textarea>
+        <div class="flex-row"><button id="genRetroBtn">📖 Сгенерировать</button><button id="genRetroLocalBtn" class="secondary">📋 Универсальный</button></div>
+        <div id="retroOutput" class="output"></div>
+    </div>
+
+    <!-- Отчёт CTO -->
+    <div id="report" class="tab-pane">
+        <h3>📑 Отчёт для CTO</h3>
+        <div class="flex-row"><button id="genReportBtn">📊 Сформировать</button><button id="copyReportBtn" class="secondary">📋 Копировать</button></div>
+        <div id="reportOutput" class="output"></div>
+    </div>
+
+    <!-- Сравнение CSV -->
+    <div id="sprint" class="tab-pane">
+        <h3>📊 Сравнительный анализ до 10 CSV</h3>
+        <input type="file" id="multiCsvFiles" accept=".csv" multiple>
+        <button id="clearAllFilesBtn" class="danger">🗑️ Очистить все</button>
+        <div id="filesList" class="file-list">📁 Нет файлов</div>
+        <div class="flex-row"><button id="compareAllBtn" class="success">🔍 Сравнить все</button><button id="compareExampleBtn" class="secondary">📋 Пример</button></div>
+        <div id="csvOutput" class="output"></div>
+    </div>
+
+    <!-- Немой наблюдатель -->
+    <div id="observer" class="tab-pane">
+        <h3>🎙️ Немой наблюдатель</h3>
+        <textarea id="manualTranscript" rows="6" placeholder="Вставьте текст встречи..."></textarea>
+        <button id="analyzeTextBtn">🔍 Анализировать</button>
+        <div id="observerOutput" class="output"></div>
+    </div>
+
+    <!-- Анализ графиков -->
+    <div id="charts" class="tab-pane">
+        <h3>📈 Анализ графиков (скриншоты)</h3>
+        <input type="file" id="chartImages" accept="image/*" multiple>
+        <button id="clearChartsBtn" class="danger">🗑️ Очистить</button>
+        <div id="chartsContainer"></div>
+        <div class="flex-row"><button id="compareChartsBtn" class="success">🔍 Сравнить графики</button><button id="chartsExampleBtn" class="secondary">📋 Пример</button></div>
+        <div id="chartsOutput" class="output"></div>
+    </div>
 </div>
 
 <script>
-    // ====================== ОБЩИЕ ДАННЫЕ ======================
+    // ====================== КОМАНДЫ И АНАЛИТИКА ======================
     let teams = [];
 
-    // Загрузка команд из localStorage
     function loadTeams() {
-        const stored = localStorage.getItem('scrum_teams_v2');
+        const stored = localStorage.getItem('scrum_teams_v3');
         if(stored) {
             teams = JSON.parse(stored);
         } else {
-            // Миграция со старой версии
-            const old = localStorage.getItem('scrum_teams');
-            if(old) {
-                const oldTeams = JSON.parse(old);
-                teams = oldTeams.map(t => ({ ...t, csvData: [] }));
-            } else {
-                teams = [
-                    { id: 1, name: 'Alpha (бэкенд)', context: 'Java, микросервисы', csvData: [] },
-                    { id: 2, name: 'Beta (фронтенд)', context: 'React, мобилка', csvData: [] },
-                    { id: 3, name: 'Gamma (данные)', context: 'ETL, дашборды', csvData: [] }
-                ];
-            }
+            // Стартовые команды
+            teams = [
+                { id: 1, name: 'Alpha (бэкенд)', context: 'Java, микросервисы', csvData: [] },
+                { id: 2, name: 'Beta (фронтенд)', context: 'React, мобилка', csvData: [] },
+                { id: 3, name: 'Gamma (данные)', context: 'ETL, дашборды', csvData: [] }
+            ];
         }
-        // Убедимся, что у каждой команды есть csvData
         teams.forEach(t => { if(!t.csvData) t.csvData = []; });
         saveTeams();
         renderTeams();
@@ -99,99 +141,12 @@
     }
 
     function saveTeams() {
-        localStorage.setItem('scrum_teams_v2', JSON.stringify(teams));
+        localStorage.setItem('scrum_teams_v3', JSON.stringify(teams));
         renderTeams();
         updateSelects();
     }
 
-    function renderTeams() {
-        const container = document.getElementById('teamsList');
-        if(!container) return;
-        container.innerHTML = '';
-        teams.forEach(team => {
-            // Агрегируем статистику по всем CSV команды
-            const stats = aggregateTeamStats(team.csvData);
-            const typeDist = stats.typeDistribution;
-            const percentDone = stats.percentDoneAvg; // средний процент выполнения
-            const avgVelocitySP = stats.avgVelocitySP;
-            const avgVelocityTasks = stats.avgVelocityTasks;
-            const filesCount = team.csvData.length;
-
-            let typeHtml = '';
-            if(Object.keys(typeDist).length) {
-                typeHtml = Object.entries(typeDist).map(([k,v]) => `<span class="badge">${k}: ${v}%</span>`).join('');
-            } else {
-                typeHtml = '<span class="badge">Нет данных</span>';
-            }
-
-            const card = document.createElement('div');
-            card.className = 'team-card';
-            card.innerHTML = `
-                <div class="team-name">
-                    <span>${escapeHtml(team.name)}</span>
-                    <div>
-                        <button class="small secondary" onclick="editTeam(${team.id})">✏️</button>
-                        <button class="small secondary" onclick="deleteTeam(${team.id})">🗑️</button>
-                    </div>
-                </div>
-                <div class="badge">${escapeHtml(team.context || 'нет контекста')}</div>
-                <div class="stats">
-                    <p><strong>📊 Аналитика по ${filesCount} загруженным спринтам:</strong></p>
-                    <p>📌 Распределение типов: ${typeHtml}</p>
-                    <p>✅ Процент выполненных задач: <strong>${percentDone}%</strong> (средний)</p>
-                    <p>⚡ Средняя скорость: <strong>${avgVelocitySP} SP</strong> / спринт | <strong>${avgVelocityTasks} задач</strong> / спринт</p>
-                </div>
-                <div class="flex-row" style="margin-top: 12px;">
-                    <button class="small" onclick="uploadCSVForTeam(${team.id})">📊 Загрузить CSV (спринт)</button>
-                    <button class="small secondary" onclick="showTeamFiles(${team.id})">📋 История (${filesCount}/30)</button>
-                </div>
-            `;
-            container.appendChild(card);
-        });
-        if(!teams.length) container.innerHTML = '<div style="padding:20px;text-align:center;">Нет команд. Добавьте первую!</div>';
-    }
-
-    // Агрегация статистики по всем CSV команды
-    function aggregateTeamStats(csvDataList) {
-        if(!csvDataList.length) {
-            return { typeDistribution: {}, percentDoneAvg: 0, avgVelocitySP: 0, avgVelocityTasks: 0 };
-        }
-        let typeCounts = {};
-        let totalDonePercent = 0;
-        let totalVelocitySP = 0;
-        let totalVelocityTasks = 0;
-        let validSprints = 0;
-
-        for(let item of csvDataList) {
-            const metrics = item.metrics;
-            if(!metrics) continue;
-            // Распределение типов
-            for(let [type, count] of Object.entries(metrics.typeCounts || {})) {
-                typeCounts[type] = (typeCounts[type] || 0) + count;
-            }
-            // Процент выполнения
-            totalDonePercent += metrics.completionPercent || 0;
-            // Скорость в SP и задачах
-            totalVelocitySP += metrics.velocitySP || 0;
-            totalVelocityTasks += metrics.velocityTasks || 0;
-            validSprints++;
-        }
-        // Нормализация типов в проценты
-        let totalTasks = Object.values(typeCounts).reduce((a,b)=>a+b,0);
-        let typeDistribution = {};
-        if(totalTasks > 0) {
-            for(let [type, count] of Object.entries(typeCounts)) {
-                typeDistribution[type] = Math.round((count / totalTasks) * 100);
-            }
-        }
-        const percentDoneAvg = validSprints ? Math.round(totalDonePercent / validSprints) : 0;
-        const avgVelocitySP = validSprints ? Math.round(totalVelocitySP / validSprints) : 0;
-        const avgVelocityTasks = validSprints ? Math.round(totalVelocityTasks / validSprints) : 0;
-
-        return { typeDistribution, percentDoneAvg, avgVelocitySP, avgVelocityTasks };
-    }
-
-    // Парсинг CSV и вычисление метрик для одного файла
+    // Парсинг CSV и вычисление метрик
     function parseCSVMetrics(csvText, fileName) {
         const lines = csvText.split(/\r?\n/).filter(l => l.trim());
         if(lines.length < 2) return null;
@@ -231,7 +186,6 @@
                 doneTasks++;
                 doneSP += points;
             }
-            // Тип задачи
             let taskType = 'Other';
             if(typeCol !== -1 && cols[typeCol]) {
                 let t = cols[typeCol].toLowerCase();
@@ -245,7 +199,7 @@
             typeCounts[taskType] = (typeCounts[taskType] || 0) + 1;
         }
         const completionPercent = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
-        const velocitySP = totalSP;  // за спринт
+        const velocitySP = totalSP;
         const velocityTasks = totalTasks;
         return {
             fileName,
@@ -258,12 +212,91 @@
         };
     }
 
-    // Загрузка CSV для команды
+    // Агрегация статистики по всем CSV команды
+    function aggregateTeamStats(csvDataList) {
+        if(!csvDataList.length) {
+            return { typeDistribution: {}, percentDoneAvg: 0, avgVelocitySP: 0, avgVelocityTasks: 0 };
+        }
+        let typeCounts = {};
+        let totalDonePercent = 0;
+        let totalVelocitySP = 0;
+        let totalVelocityTasks = 0;
+        let validSprints = 0;
+
+        for(let metrics of csvDataList) {
+            if(!metrics) continue;
+            for(let [type, count] of Object.entries(metrics.typeCounts || {})) {
+                typeCounts[type] = (typeCounts[type] || 0) + count;
+            }
+            totalDonePercent += metrics.completionPercent || 0;
+            totalVelocitySP += metrics.velocitySP || 0;
+            totalVelocityTasks += metrics.velocityTasks || 0;
+            validSprints++;
+        }
+        let totalTasks = Object.values(typeCounts).reduce((a,b)=>a+b,0);
+        let typeDistribution = {};
+        if(totalTasks > 0) {
+            for(let [type, count] of Object.entries(typeCounts)) {
+                typeDistribution[type] = Math.round((count / totalTasks) * 100);
+            }
+        }
+        const percentDoneAvg = validSprints ? Math.round(totalDonePercent / validSprints) : 0;
+        const avgVelocitySP = validSprints ? Math.round(totalVelocitySP / validSprints) : 0;
+        const avgVelocityTasks = validSprints ? Math.round(totalVelocityTasks / validSprints) : 0;
+        return { typeDistribution, percentDoneAvg, avgVelocitySP, avgVelocityTasks };
+    }
+
+    function renderTeams() {
+        const container = document.getElementById('teamsList');
+        if(!container) return;
+        container.innerHTML = '';
+        teams.forEach(team => {
+            const stats = aggregateTeamStats(team.csvData);
+            const typeDist = stats.typeDistribution;
+            const percentDone = stats.percentDoneAvg;
+            const avgSP = stats.avgVelocitySP;
+            const avgTasks = stats.avgVelocityTasks;
+            const filesCount = team.csvData.length;
+
+            let typeHtml = '';
+            if(Object.keys(typeDist).length) {
+                typeHtml = Object.entries(typeDist).map(([k,v]) => `<span class="badge">${k}: ${v}%</span>`).join('');
+            } else {
+                typeHtml = '<span class="badge">Нет данных</span>';
+            }
+
+            const card = document.createElement('div');
+            card.className = 'team-card';
+            card.innerHTML = `
+                <div class="team-name">
+                    <span>${escapeHtml(team.name)}</span>
+                    <div>
+                        <button class="small secondary" onclick="editTeam(${team.id})">✏️</button>
+                        <button class="small secondary" onclick="deleteTeam(${team.id})">🗑️</button>
+                    </div>
+                </div>
+                <div class="badge">${escapeHtml(team.context || 'нет контекста')}</div>
+                <div class="stats">
+                    <p><strong>📊 Аналитика по ${filesCount} загруженным спринтам:</strong></p>
+                    <p>📌 Распределение типов: ${typeHtml}</p>
+                    <p>✅ Процент выполненных задач: <strong>${percentDone}%</strong> (средний)</p>
+                    <p>⚡ Средняя скорость: <strong>${avgSP} SP</strong> / спринт | <strong>${avgTasks} задач</strong> / спринт</p>
+                </div>
+                <div class="flex-row" style="margin-top: 12px;">
+                    <button class="small" onclick="uploadCSVForTeam(${team.id})">📊 Загрузить CSV (спринт)</button>
+                    <button class="small secondary" onclick="showTeamFiles(${team.id})">📋 История (${filesCount}/30)</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+        if(!teams.length) container.innerHTML = '<div style="padding:20px;text-align:center;">Нет команд. Добавьте первую!</div>';
+    }
+
     window.uploadCSVForTeam = function(teamId) {
         const team = teams.find(t => t.id === teamId);
         if(!team) return;
         if(team.csvData.length >= 30) {
-            alert('Максимум 30 CSV-файлов для команды. Удалите лишние через "История".');
+            alert('Максимум 30 CSV-файлов для команды.');
             return;
         }
         const input = document.createElement('input');
@@ -280,7 +313,7 @@
                     saveTeams();
                     alert(`Файл "${file.name}" загружен для команды "${team.name}"`);
                 } else {
-                    alert('Ошибка парсинга CSV. Проверьте формат (должны быть колонки со статусом и типом).');
+                    alert('Ошибка парсинга CSV. Убедитесь, что есть колонки со статусом (Done/Closed) и типом (Bug/Task/Story).');
                 }
             };
             reader.readAsText(file, 'UTF-8');
@@ -290,14 +323,13 @@
 
     window.showTeamFiles = function(teamId) {
         const team = teams.find(t => t.id === teamId);
-        if(!team) return;
-        if(!team.csvData.length) {
+        if(!team || !team.csvData.length) {
             alert('Нет загруженных CSV для этой команды.');
             return;
         }
         let modalHtml = `<div class="overlay" onclick="closeModal()"></div><div class="file-list-modal"><h4>История CSV для ${escapeHtml(team.name)}</h4><ul>`;
         team.csvData.forEach((item, idx) => {
-            modalHtml += `<li><strong>${escapeHtml(item.fileName)}</strong> (${new Date(item.date).toLocaleDateString()}) — задачи: ${item.totalTasks}, выполнено: ${item.doneTasks} (${item.completionPercent}%), SP: ${item.totalSP}<button class="small danger" onclick="removeTeamCSV(${teamId}, ${idx})">Удалить</button></li>`;
+            modalHtml += `<li><strong>${escapeHtml(item.fileName)}</strong> (${new Date(item.date).toLocaleDateString()}) — задачи: ${item.totalTasks}, выполнено: ${item.doneTasks} (${item.completionPercent}%), SP: ${item.totalSP} <button class="small danger" onclick="removeTeamCSV(${teamId}, ${idx})">Удалить</button></li>`;
         });
         modalHtml += `</ul><button onclick="closeModal()">Закрыть</button></div>`;
         const div = document.createElement('div');
@@ -312,7 +344,7 @@
             team.csvData.splice(idx, 1);
             saveTeams();
             closeModal();
-            showTeamFiles(teamId); // обновить модалку
+            showTeamFiles(teamId);
         }
     };
 
@@ -321,7 +353,6 @@
         if(modal) modal.remove();
     };
 
-    // Редактирование и удаление команд
     window.deleteTeam = function(id) {
         teams = teams.filter(t => t.id !== id);
         saveTeams();
@@ -356,8 +387,7 @@
     function getTeamById(id) { return teams.find(t => t.id == id); }
     function escapeHtml(str) { return str ? str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])) : ''; }
 
-    // ---------- ОСТАЛЬНЫЕ ВКЛАДКИ (DoD, Ретро, Отчёт, Сравнение CSV, Немой наблюдатель, Графики) ----------
-    // DoD
+    // ====================== DoD ======================
     document.getElementById('genDodBtn')?.addEventListener('click', () => {
         const sel = document.getElementById('dodTeamSelect');
         if(!sel.value) { alert('Выберите команду'); return; }
@@ -366,6 +396,7 @@
         let dod = `🎯 DoD для "${team.name}"\n\n`;
         if(ctx.includes('микросервис')) dod += `✅ Контракты API\n✅ Сканирование зависимостей\n✅ Метрики\n`;
         else if(ctx.includes('react')) dod += `✅ Lighthouse >90\n✅ A11y\n✅ Storybook\n`;
+        else if(ctx.includes('etl')) dod += `✅ Качество данных\n✅ ETL тесты\n✅ Дашборды\n`;
         else dod += `✅ Acceptance-тесты\n✅ Логирование\n✅ Нагрузка\n`;
         dod += `\n📌 Обязательные:\n- Code review\n- Unit-тесты >70%\n- Документация\n- CI/CD зелёный`;
         document.getElementById('dodOutput').innerText = dod;
@@ -376,7 +407,8 @@
         const team = getTeamById(parseInt(sel.value));
         document.getElementById('dodOutput').innerText = `✅ DoD для "${team.name}" (базовый):\n□ Code review (2 аппрува)\n□ Unit-тесты >70%\n□ Интеграционные тесты\n□ Документация\n□ Деплой на staging\n□ PO принял`;
     });
-    // Ретро
+
+    // ====================== Ретро ======================
     document.getElementById('genRetroBtn')?.addEventListener('click', () => {
         const sel = document.getElementById('retroTeamSelect');
         if(!sel.value) { alert('Выберите команду'); return; }
@@ -390,7 +422,8 @@
         const team = getTeamById(parseInt(sel.value));
         document.getElementById('retroOutput').innerText = `🔄 Универсальная ретро для ${team.name}\n1. Эмодзи спринта\n2. MAD SAD GLAD\n3. Генерация идей\n4. Голосование точками\n5. Чек-аут`;
     });
-    // Отчёт CTO
+
+    // ====================== Отчёт CTO ======================
     document.getElementById('genReportBtn')?.addEventListener('click', () => {
         let report = `📢 ОТЧЁТ ДЛЯ СТО\nДата: ${new Date().toLocaleDateString()}\nКоманд: ${teams.length}\n\n🎯 Вывод: стабильность хорошая, нужны инвестиции в тест-среды.\n⚠️ Риски: внешние API, долгий code review\n✅ Победы: DoD внедрён, ретро проведены\n📌 Запрос: бюджет на автоматизацию\n📋 Команды:\n${teams.map(t => `- ${t.name}: ${t.context || '-'} (загружено CSV: ${t.csvData.length})`).join('\n')}`;
         document.getElementById('reportOutput').innerText = report;
@@ -399,28 +432,201 @@
         const txt = document.getElementById('reportOutput').innerText;
         if(txt) { navigator.clipboard.writeText(txt); alert('Скопировано'); }
     });
-    // Сравнение CSV (упрощённая версия)
+
+    // ====================== Сравнение CSV ======================
     let uploadedFiles = [];
-    function analyzeCSV(csvText, fileName) { /* аналог parseCSVMetrics но для временного сравнения */ return parseCSVMetrics(csvText, fileName); }
-    function renderFileList() { /* ... */ }
-    window.removeFile = function(idx) { uploadedFiles.splice(idx,1); renderFileList(); };
-    function processNewFiles(files) { /* ... */ }
-    document.getElementById('multiCsvFiles')?.addEventListener('change', e => processNewFiles(Array.from(e.target.files)));
-    document.getElementById('clearAllFilesBtn')?.addEventListener('click', ()=>{ uploadedFiles=[]; renderFileList(); });
-    function generateComparison() { /* ... */ return 'Сравнение временно упрощено'; }
-    document.getElementById('compareAllBtn')?.addEventListener('click', ()=>{ document.getElementById('csvOutput').innerHTML = generateComparison().replace(/\n/g,'<br>'); });
-    // Немой наблюдатель
-    function analyzeMeeting(text) { /* ... */ return 'Анализ текста'; }
-    document.getElementById('analyzeTextBtn')?.addEventListener('click', ()=>{ /* ... */ });
-    // Графики (заглушка)
+    function analyzeTempCSV(csvText, fileName) {
+        return parseCSVMetrics(csvText, fileName);
+    }
+    function renderTempFileList() {
+        const container = document.getElementById('filesList');
+        if(!container) return;
+        if(!uploadedFiles.length) { container.innerHTML = '📁 Нет загруженных файлов'; return; }
+        container.innerHTML = `<div style="margin-bottom:8px;">📄 Файлов: ${uploadedFiles.length}/10</div>` + 
+            uploadedFiles.map((f,i)=>`<div class="file-item"><span class="file-name">${escapeHtml(f.name)}</span><button class="small danger" onclick="removeTempFile(${i})">🗑️</button></div>`).join('');
+    }
+    window.removeTempFile = function(idx) {
+        uploadedFiles.splice(idx,1);
+        renderTempFileList();
+        document.getElementById('csvOutput').innerHTML = '';
+    };
+    function processTempFiles(files) {
+        for(let file of files) {
+            if(uploadedFiles.length >= 10) { alert('Максимум 10 файлов'); break; }
+            if(uploadedFiles.some(f=>f.name===file.name)) { alert(`Файл "${file.name}" уже загружен`); continue; }
+            let reader = new FileReader();
+            reader.onload = (function(f) { return function(e) {
+                let metrics = analyzeTempCSV(e.target.result, f.name);
+                if(metrics) uploadedFiles.push({ name: f.name, metrics });
+                else alert(`Ошибка анализа ${f.name}`);
+                renderTempFileList();
+            }})(file);
+            reader.readAsText(file,'UTF-8');
+        }
+        document.getElementById('multiCsvFiles').value = '';
+    }
+    document.getElementById('multiCsvFiles')?.addEventListener('change', e => processTempFiles(Array.from(e.target.files)));
+    document.getElementById('clearAllFilesBtn')?.addEventListener('click', ()=>{ uploadedFiles=[]; renderTempFileList(); document.getElementById('csvOutput').innerHTML=''; });
+    function generateTempComparison() {
+        if(!uploadedFiles.length) return '❌ Нет файлов для сравнения.';
+        if(uploadedFiles.length === 1) {
+            let m = uploadedFiles[0].metrics;
+            return `📊 Анализ одного файла\n\nФайл: ${m.fileName}\nЗадач: ${m.totalTasks}\nSP всего: ${m.totalSP}\nВыполнено: ${m.doneSP}\nСкорость: ${m.completionPercent}%\nБагов: ${m.typeCounts.Bug || 0}`;
+        }
+        let report = `📊 СРАВНЕНИЕ ${uploadedFiles.length} CSV\n\n`;
+        report += `┌──────────────────┬────────┬────────┬────────┬────────┬──────────┐\n`;
+        report += `│ Файл             │ Задач  │ ВсегоSP│ Выполн │ Скорость│ Баги     │\n`;
+        report += `├──────────────────┼────────┼────────┼────────┼────────┼──────────┤\n`;
+        for(let item of uploadedFiles) {
+            let m = item.metrics;
+            let nameShort = m.fileName.length>16 ? m.fileName.slice(0,13)+'...' : m.fileName.padEnd(16);
+            report += `│ ${nameShort} │ ${String(m.totalTasks).padEnd(6)} │ ${String(m.totalSP).padEnd(6)} │ ${String(m.doneSP).padEnd(6)} │ ${String(m.completionPercent).padEnd(6)}% │ ${m.typeCounts.Bug || 0}       │\n`;
+        }
+        report += `└──────────────────┴────────┴────────┴────────┴────────┴──────────┘\n`;
+        return report;
+    }
+    document.getElementById('compareAllBtn')?.addEventListener('click', ()=>{
+        document.getElementById('csvOutput').innerHTML = generateTempComparison().replace(/\n/g,'<br>');
+    });
+    document.getElementById('compareExampleBtn')?.addEventListener('click', ()=>{
+        let example = [
+            { name: 'Альфа.csv', content: `Sprint,Team,Story Points,Status,Type\nS1,Alpha,5,Done,Task\nS1,Alpha,8,Done,Task\nS1,Alpha,3,Done,Bug\nS1,Alpha,2,To Do,Task` },
+            { name: 'Бета.csv', content: `Sprint,Team,Story Points,Status,Type\nS1,Beta,5,Done,Task\nS1,Beta,5,Done,Task\nS1,Beta,3,To Do,Bug\nS1,Beta,2,To Do,Task` }
+        ];
+        uploadedFiles = [];
+        for(let ex of example) {
+            let m = analyzeTempCSV(ex.content, ex.name);
+            if(m) uploadedFiles.push({ name: ex.name, metrics: m });
+        }
+        renderTempFileList();
+        document.getElementById('csvOutput').innerHTML = generateTempComparison().replace(/\n/g,'<br>');
+    });
+
+    // ====================== Немой наблюдатель ======================
+    function analyzeMeeting(text) {
+        let out = '🔍 АНАЛИЗ ВСТРЕЧИ\n\n';
+        let blockers = [], risks = [], conflicts = [];
+        if(/блокер|завис|не могу|жду|проблема|тормозит/i.test(text)) blockers.push('🚧 Блокеры');
+        if(/deadline|срок|успеваем|опазд|риск|не успеем/i.test(text)) risks.push('⚠️ Риски сроков');
+        if(/спор|не согласен|почему так|виноват|ты должен|вы должны/i.test(text)) conflicts.push('💢 Конфликт');
+        if(/тесты|баг|упало|сломалось|ошибка|дефект/i.test(text)) risks.push('🐞 Качество');
+        if(/документация|не понятно|нет описания/i.test(text)) blockers.push('📄 Документация');
+        if(/зависим|ждём от|тикет от/i.test(text)) blockers.push('🔗 Внешние зависимости');
+        if(blockers.length) out += `🚧 БЛОКЕРЫ:\n${blockers.map(b=>`   ${b}`).join('\n')}\n\n`;
+        if(risks.length) out += `⚠️ РИСКИ:\n${risks.map(r=>`   ${r}`).join('\n')}\n\n`;
+        if(conflicts.length) out += `💢 КОНФЛИКТЫ:\n${conflicts.map(c=>`   ${c}`).join('\n')}\n\n`;
+        out += `💡 РЕКОМЕНДАЦИИ:\n`;
+        if(blockers.length) out += `• Заведите трекер блокеров\n`;
+        if(risks.some(r=>r.includes('сроков'))) out += `• Пересмотрите объём спринта\n`;
+        if(conflicts.length) out += `• Проведите 1-1 встречи\n`;
+        let iCount = (text.match(/я|мне|меня/gi)||[]).length;
+        let weCount = (text.match(/мы|нас|нами/gi)||[]).length;
+        if(iCount > weCount*1.5 && weCount) out += `• Команда говорит "я" чаще "мы" → слабая идентичность\n`;
+        if(!blockers.length && !risks.length && !conflicts.length) out += `• Встреча ровная, обратите внимание на молчаливых.\n`;
+        return out;
+    }
+    document.getElementById('analyzeTextBtn')?.addEventListener('click', ()=>{
+        let txt = document.getElementById('manualTranscript').value;
+        if(!txt.trim()) { alert('Введите текст встречи'); return; }
+        document.getElementById('observerOutput').innerHTML = analyzeMeeting(txt).replace(/\n/g,'<br>');
+    });
+
+    // ====================== Анализ графиков ======================
     let chartItems = [];
-    function renderCharts() { /* ... */ }
-    window.removeChart = function(idx) { chartItems.splice(idx,1); renderCharts(); };
-    document.getElementById('chartImages')?.addEventListener('change', (e)=>{ /* ... */ });
-    document.getElementById('clearChartsBtn')?.addEventListener('click', ()=>{ chartItems=[]; renderCharts(); });
-    function compareCharts() { return 'Анализ графиков'; }
-    document.getElementById('compareChartsBtn')?.addEventListener('click', ()=>{ document.getElementById('chartsOutput').innerHTML = compareCharts().replace(/\n/g,'<br>'); });
-    document.getElementById('chartsExampleBtn')?.addEventListener('click', ()=>{ /* ... */ });
+    function renderChartItems() {
+        const container = document.getElementById('chartsContainer');
+        if(!container) return;
+        if(!chartItems.length) { container.innerHTML = '<div class="api-note">Загрузите изображения графиков (до 10).</div>'; return; }
+        container.innerHTML = '';
+        chartItems.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'chart-card';
+            div.innerHTML = `
+                <div class="flex-row" style="justify-content: space-between;">
+                    <strong>График ${idx+1}</strong>
+                    <button class="small danger" onclick="removeChartItem(${idx})">🗑️</button>
+                </div>
+                <img src="${item.url}" class="chart-img" alt="график">
+                <div class="metrics-grid">
+                    <label>📉 Сгорание (0-100%): <input type="number" id="burn_${idx}" value="${item.burn || 70}" step="5"></label>
+                    <label>⚡ Велосити (SP): <input type="number" id="vel_${idx}" value="${item.velocity || 30}" step="1"></label>
+                    <label>🎯 Предсказуемость (%): <input type="number" id="pred_${idx}" value="${item.predictability || 75}" step="5"></label>
+                    <label>⏳ Осталось задач: <input type="number" id="rem_${idx}" value="${item.remaining || 5}" step="1"></label>
+                    <label>⌛ Время выполнения (дни): <input type="number" id="lead_${idx}" value="${item.leadTime || 4}" step="0.5"></label>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+    window.removeChartItem = function(idx) {
+        URL.revokeObjectURL(chartItems[idx].url);
+        chartItems.splice(idx,1);
+        renderChartItems();
+    };
+    document.getElementById('chartImages')?.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        if(chartItems.length + files.length > 10) { alert('Максимум 10 изображений'); return; }
+        for(let file of files) {
+            if(!file.type.startsWith('image/')) continue;
+            const url = URL.createObjectURL(file);
+            chartItems.push({ url, burn:70, velocity:30, predictability:75, remaining:5, leadTime:4 });
+        }
+        renderChartItems();
+        e.target.value = '';
+    });
+    document.getElementById('clearChartsBtn')?.addEventListener('click', () => {
+        chartItems.forEach(i => URL.revokeObjectURL(i.url));
+        chartItems = [];
+        renderChartItems();
+        document.getElementById('chartsOutput').innerHTML = '';
+    });
+    function collectChartMetrics() {
+        let metrics = [];
+        for(let i=0; i<chartItems.length; i++) {
+            metrics.push({
+                name: `График ${i+1}`,
+                burn: parseFloat(document.getElementById(`burn_${i}`)?.value) || 0,
+                velocity: parseFloat(document.getElementById(`vel_${i}`)?.value) || 0,
+                predictability: parseFloat(document.getElementById(`pred_${i}`)?.value) || 0,
+                remaining: parseFloat(document.getElementById(`rem_${i}`)?.value) || 0,
+                leadTime: parseFloat(document.getElementById(`lead_${i}`)?.value) || 0
+            });
+        }
+        return metrics;
+    }
+    function compareChartsMetrics(metrics) {
+        if(!metrics.length) return '❌ Нет данных.';
+        let report = `📊 СРАВНЕНИЕ ГРАФИКОВ (${metrics.length})\n\n`;
+        report += `┌────────────┬──────────┬──────────┬────────────────┬──────────────┬─────────────────┐\n`;
+        report += `│ График     │ Сгорание │ Велосити │ Предсказуемость│ Оставшиеся   │ Время           │\n`;
+        report += `├────────────┼──────────┼──────────┼────────────────┼──────────────┼─────────────────┤\n`;
+        for(let m of metrics) {
+            report += `│ ${m.name.padEnd(10)} │ ${String(m.burn).padEnd(8)} │ ${String(m.velocity).padEnd(8)} │ ${String(m.predictability).padEnd(14)} │ ${String(m.remaining).padEnd(12)} │ ${String(m.leadTime).padEnd(15)} │\n`;
+        }
+        report += `└────────────┴──────────┴──────────┴────────────────┴──────────────┴─────────────────┘\n\n`;
+        let best = metrics.reduce((a,b)=> a.burn > b.burn ? a : b);
+        let worst = metrics.reduce((a,b)=> a.burn < b.burn ? a : b);
+        report += `🏆 Лучшее сгорание: ${best.name} (${best.burn}%)\n`;
+        if(worst.burn < 50) report += `⚠️ Худшее сгорание: ${worst.name} (${worst.burn}%) — отставание от графика.\n`;
+        return report;
+    }
+    document.getElementById('compareChartsBtn')?.addEventListener('click', () => {
+        const metrics = collectChartMetrics();
+        const report = compareChartsMetrics(metrics);
+        document.getElementById('chartsOutput').innerHTML = report.replace(/\n/g,'<br>');
+    });
+    document.getElementById('chartsExampleBtn')?.addEventListener('click', () => {
+        if(chartItems.length) { alert('Очистите текущие графики'); return; }
+        const canvas = document.createElement('canvas'); canvas.width=400; canvas.height=200;
+        const ctx = canvas.getContext('2d'); ctx.fillStyle='#f8fafc'; ctx.fillRect(0,0,400,200);
+        ctx.fillStyle='#3b82f6'; ctx.fillRect(0,100,400,30);
+        ctx.fillStyle='#1e293b'; ctx.font='14px sans-serif'; ctx.fillText('Пример графика',20,50);
+        const url = canvas.toDataURL();
+        chartItems.push({ url, burn:85, velocity:42, predictability:90, remaining:3, leadTime:3.5 });
+        chartItems.push({ url, burn:45, velocity:22, predictability:55, remaining:15, leadTime:8 });
+        renderChartItems();
+    });
+
     // Табы
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
