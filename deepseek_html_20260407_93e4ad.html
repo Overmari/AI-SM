@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scrum Master Assistant — Flow Metrics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 24px 32px;
+            border-radius: 24px;
+            margin-bottom: 32px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .header p {
+            opacity: 0.8;
+            font-size: 14px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            background: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 40px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #334155;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102,126,234,0.3);
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: #e2e8f0;
+            transform: translateY(-1px);
+        }
+
+        /* Panels */
+        .panel {
+            display: none;
+            animation: fadeIn 0.25s ease;
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 24px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1e293b;
+            border-left: 4px solid #667eea;
+            padding-left: 14px;
+        }
+
+        .grid-5 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+        }
+
+        .metric {
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 20px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s;
+        }
+
+        .metric-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #4f46e5;
+            line-height: 1.2;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: #64748b;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .team-card {
+            background: white;
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #eef2ff;
+        }
+
+        .team-status-bar {
+            height: 4px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .team-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .team-desc {
+            color: #475569;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .dropzone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 20px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 20px;
+            background: #fafcff;
+        }
+
+        .dropzone:hover {
+            border-color: #4f46e5;
+            background: #f5f3ff;
+        }
+
+        button {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        button.danger {
+            background: #ef4444;
+        }
+
+        /* Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 32px;
+            padding: 28px;
+            max-width: 520px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 40px -12px rgba(0,0,0,0.25);
+        }
+
+        .modal-content h3 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #0f172a;
+        }
+
+        .modal-content label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #334155;
+        }
+
+        .modal-content input, .modal-content textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 16px;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .file-list {
+            max-height: 260px;
+            overflow-y: auto;
+            margin: 16px 0;
+            border-radius: 20px;
+            background: #f8fafc;
+            padding: 8px;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .type-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 40px;
+            font-size: 11px;
+            font-weight: 600;
+            margin: 3px;
+        }
+
+        .type-badge.Bug { background: #fee2e2; color: #b91c1c; }
+        .type-badge.Story { background: #dcfce7; color: #15803d; }
+        .type-badge.Task { background: #dbeafe; color: #1d4ed8; }
+        .type-badge.Epic { background: #fef3c7; color: #b45309; }
+        .type-badge.Spike { background: #f3e8ff; color: #6b21a5; }
+
+        .select-team {
+            width: 100%;
+            padding: 12px;
+            border-radius: 20px;
+            border: 1px solid #cbd5e1;
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+
+        canvas {
+            max-height: 400px;
+            margin-top: 20px;
+        }
+
+        .recommendation {
+            background: #fffbeb;
+            padding: 16px;
+            border-radius: 20px;
+            border-left: 4px solid #f59e0b;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-top: 20px;
+        }
+        
+        .chart-card {
+            background: white;
+            border-radius: 20px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+        }
+        
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #1e293b;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        @media (max-width: 768px) {
+            .grid-5 { grid-template-columns: 1fr; }
+            .tab-btn { padding: 6px 16px; font-size: 12px; }
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🧠 Scrum Master Assistant — Flow Metrics</h1>
+        <p>Flow Distribution · Flow Velocity · Flow Time · Flow Load · Flow Predictability</p>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="teams">📋 Мои команды</button>
+        <button class="tab-btn" data-tab="metrics">📊 Flow Analytics</button>
+    </div>
+
+    <div id="teams" class="panel active">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="font-size: 22px; font-weight: 600;">Команды</h2>
+            <button id="addTeamBtn">+ Новая команда</button>
+        </div>
+        <div id="teamsList"></div>
+    </div>
+
+    <div id="metrics" class="panel">
+        <div class="card">
+            <div class="card-header">📊 Детальный анализ Flow Metrics</div>
+            <select id="metricsTeamSelect" class="select-team"><option value="">-- Выберите команду --</option></select>
+            <div id="metricsDetails"></div>
+            <div class="charts-grid" id="chartsContainer"></div>
+        </div>
+        <div class="card">
+            <div class="card-header">💡 Рекомендации</div>
+            <div id="recommendationsBlock"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let teams = [];
+    let velocityChart = null, typeChart = null, loadChart = null, flowTimeChart = null, predictabilityChart = null;
+
+    function loadTeams() { const stored = localStorage.getItem('teams'); if (stored) teams = JSON.parse(stored); renderTeams(); updateMetricsTeamSelect(); }
+    function saveTeams() { localStorage.setItem('teams', JSON.stringify(teams)); renderTeams(); updateMetricsTeamSelect(); }
+
+    function getStatusColor(metrics) { const v = metrics.avgFlowVelocitySP || 0; const p = metrics.flowPredictability || 0; if (v > 20 && p > 75) return '#10b981'; if (v > 15 && p > 55) return '#f59e0b'; return '#ef4444'; }
+    function parseDate(dateStr) { if (!dateStr) return null; let d = new Date(dateStr); if (!isNaN(d)) return d; let parts = dateStr.match(/(\d+)[\/\-\.](\d+)[\/\-\.](\d+)/); if (parts) return new Date(parts[3], parts[2]-1, parts[1]); return null; }
+    function daysBetween(d1, d2) { if (!d1 || !d2) return null; return Math.abs(d2 - d1) / (1000 * 60 * 60 * 24); }
+
+    function parseSingleSprint(data) {
+        let typeCount = {};
+        let doneSP = 0;
+        let flowTimes = [];
+        let loadByType = {};
+        let totalTasks = data.length;
+        let doneTasks = 0;
+        
+        data.forEach(row => {
+            let typeKey = Object.keys(row).find(k => k.toLowerCase() === 'issuetype' || k.toLowerCase() === 'issue type' || k.toLowerCase() === 'type');
+            let issueType = typeKey ? String(row[typeKey]).trim() : 'Без типа';
+            if (issueType === 'Unknown') issueType = 'Без типа';
+            
+            typeCount[issueType] = (typeCount[issueType] || 0) + 1;
+            
+            let spKey = Object.keys(row).find(k => k.toLowerCase().includes('story') || k.toLowerCase() === 'sp' || k.toLowerCase().includes('point'));
+            let sp = 1;
+            if (spKey && row[spKey]) { let p = parseFloat(String(row[spKey]).replace(/[^0-9.-]/g, '')); if (!isNaN(p) && p > 0) sp = p; }
+            
+            let statusKey = Object.keys(row).find(k => k.toLowerCase().includes('status') || k.toLowerCase().includes('state'));
+            let status = statusKey ? String(row[statusKey]).toLowerCase() : '';
+            let isDone = status.includes('done') || status.includes('closed') || status.includes('выполнен') || status.includes('закрыт') || status.includes('resolved');
+            let isCancelled = status.includes('cancelled') || status.includes('отменен');
+            
+            if (isDone && !isCancelled) {
+                doneTasks++;
+                doneSP += sp;
+            } else if (!isCancelled) {
+                loadByType[issueType] = (loadByType[issueType] || 0) + 1;
+            }
+            
+            let createdKey = Object.keys(row).find(k => k.toLowerCase().includes('created'));
+            let resolvedKey = Object.keys(row).find(k => k.toLowerCase().includes('resolv') || k.toLowerCase().includes('closed'));
+            if (createdKey && resolvedKey && isDone && !isCancelled) {
+                let created = parseDate(row[createdKey]);
+                let resolved = parseDate(row[resolvedKey]);
+                if (created && resolved) { let ft = daysBetween(created, resolved); if (ft !== null && ft >= 0) flowTimes.push(ft); }
+            }
+        });
+        
+        let avgFlowTime = flowTimes.length ? Math.round(flowTimes.reduce((a,b) => a + b, 0) / flowTimes.length * 10) / 10 : 0;
+        let flowPredictability = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+        let totalLoad = Object.values(loadByType).reduce((a,b) => a + b, 0);
+        
+        return { typeCount, doneSP, doneTasks, avgFlowTime, loadByType, totalLoad, flowPredictability, totalTasks, doneTasks, flowTimes };
+    }
+
+    function aggregateFlowMetrics(sprintsData) {
+        if (!sprintsData.length) return {
+            flowDistribution: {}, avgFlowVelocitySP: 0, avgFlowVelocityTasks: 0,
+            lastSprintVelocitySP: 0, lastSprintVelocityTasks: 0,
+            flowTime: 0, flowLoad: {}, flowLoadTotal: 0, flowPredictability: 0,
+            sprintVelocitiesSP: [], sprintVelocitiesTasks: [], sprintPredictabilities: [], allFlowTimes: []
+        };
+        
+        let aggregatedTypeCount = {};
+        let totalDoneSP = 0, totalDoneTasks = 0;
+        let totalFlowTime = 0, flowTimeCount = 0;
+        let aggregatedLoad = {};
+        let totalLoad = 0;
+        let totalPredictability = 0;
+        let sprintCount = sprintsData.length;
+        let lastSprint = sprintsData[sprintsData.length - 1];
+        let sprintVelocitiesSP = [];
+        let sprintVelocitiesTasks = [];
+        let sprintPredictabilities = [];
+        let allFlowTimes = [];
+        
+        for (let sprint of sprintsData) {
+            for (let [type, count] of Object.entries(sprint.typeCount)) aggregatedTypeCount[type] = (aggregatedTypeCount[type] || 0) + count;
+            totalDoneSP += sprint.doneSP;
+            totalDoneTasks += sprint.doneTasks;
+            sprintVelocitiesSP.push(sprint.doneSP);
+            sprintVelocitiesTasks.push(sprint.doneTasks);
+            sprintPredictabilities.push(sprint.flowPredictability);
+            if (sprint.avgFlowTime > 0) { totalFlowTime += sprint.avgFlowTime; flowTimeCount++; }
+            for (let [type, count] of Object.entries(sprint.loadByType)) {
+                aggregatedLoad[type] = (aggregatedLoad[type] || 0) + count;
+                totalLoad += count;
+            }
+            totalPredictability += sprint.flowPredictability;
+            if (sprint.flowTimes) allFlowTimes.push(...sprint.flowTimes);
+        }
+        
+        let totalCards = Object.values(aggregatedTypeCount).reduce((a,b) => a + b, 0);
+        let flowDistribution = {};
+        for (let [type, count] of Object.entries(aggregatedTypeCount)) flowDistribution[type] = { count, percent: totalCards ? Math.round((count / totalCards) * 100) : 0 };
+        
+        let avgFlowVelocitySP = Math.round(totalDoneSP / sprintCount);
+        let avgFlowVelocityTasks = Math.round(totalDoneTasks / sprintCount);
+        let avgFlowTime = flowTimeCount ? Math.round((totalFlowTime / flowTimeCount) * 10) / 10 : 0;
+        let avgPredictability = Math.round(totalPredictability / sprintCount);
+        
+        return {
+            flowDistribution,
+            avgFlowVelocitySP, avgFlowVelocityTasks,
+            lastSprintVelocitySP: lastSprint.doneSP, lastSprintVelocityTasks: lastSprint.doneTasks,
+            flowTime: avgFlowTime,
+            flowLoad: aggregatedLoad,
+            flowLoadTotal: totalLoad,
+            flowPredictability: avgPredictability,
+            sprintVelocitiesSP, sprintVelocitiesTasks, sprintPredictabilities, allFlowTimes
+        };
+    }
+
+    async function uploadCSV(teamId, file) {
+        const team = teams.find(t => t.id === teamId);
+        if (!team) return;
+        if ((team.csvFiles?.length || 0) >= 30) { alert('Максимум 30 файлов'); return; }
+        
+        const text = await file.text();
+        const lines = text.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim());
+        const data = [];
+        for (let i = 1; i < lines.length; i++) {
+            const vals = lines[i].split(',');
+            if (vals.length >= headers.length && vals.some(v => v && v.trim())) {
+                let row = {}; headers.forEach((h, idx) => row[h] = vals[idx]?.trim() || '');
+                data.push(row);
+            }
+        }
+        
+        const sprintMetrics = parseSingleSprint(data);
+        if (!team.csvData) team.csvData = [];
+        if (!team.sprintMetrics) team.sprintMetrics = [];
+        team.csvData.push(data);
+        team.sprintMetrics.push(sprintMetrics);
+        if (!team.csvFiles) team.csvFiles = [];
+        team.csvFiles.push(file.name);
+        
+        const aggregated = aggregateFlowMetrics(team.sprintMetrics);
+        team.metrics = aggregated;
+        saveTeams();
+    }
+
+    function showFileManager(teamId) {
+        const team = teams.find(t => t.id === teamId);
+        if (!team) return;
+        const modal = document.createElement('div'); modal.className = 'modal';
+        let filesHtml = team.csvFiles?.length ? team.csvFiles.map((fileName, idx) => `<div class="file-item"><span class="file-name">📄 ${escapeHtml(fileName)}</span><button class="danger" style="padding: 4px 12px;" onclick="window.deleteFile('${teamId}', ${idx})">Удалить</button></div>`).join('') : '<div style="text-align: center; padding: 20px;">Нет файлов</div>';
+        modal.innerHTML = `<div class="modal-content"><h3>📁 Управление файлами</h3><div style="margin-bottom: 8px; color:#475569;">Команда: ${escapeHtml(team.name)}</div><div class="file-list">${filesHtml}</div><div class="dropzone" style="margin-top: 16px;" onclick="document.getElementById('fileInput_modal').click()">📁 Добавить CSV</div><input type="file" id="fileInput_modal" accept=".csv" style="display: none;"><div style="display: flex; justify-content: flex-end; margin-top: 20px;"><button id="closeFileModalBtn" style="background:#e2e8f0; color:#1e293b;">Закрыть</button></div></div>`;
+        document.body.appendChild(modal);
+        document.getElementById('fileInput_modal').onchange = async (e) => { if (e.target.files[0]) { await uploadCSV(teamId, e.target.files[0]); modal.remove(); showFileManager(teamId); } };
+        document.getElementById('closeFileModalBtn').onclick = () => modal.remove();
+    }
+    
+    window.deleteFile = async function(teamId, fileIndex) {
+        if (confirm('Удалить файл?')) {
+            const team = teams.find(t => t.id === teamId);
+            if (team && team.csvFiles && team.csvFiles[fileIndex]) {
+                team.csvFiles.splice(fileIndex, 1);
+                team.csvData.splice(fileIndex, 1);
+                team.sprintMetrics.splice(fileIndex, 1);
+                const aggregated = aggregateFlowMetrics(team.sprintMetrics);
+                team.metrics = aggregated;
+                saveTeams();
+                const modal = document.querySelector('.modal'); if (modal) modal.remove();
+                showFileManager(teamId);
+            }
+        }
+    };
+
+    function renderFlowDistribution(dist) {
+        if (!Object.keys(dist).length) return 'Нет данных';
+        let html = '<div style="display: flex; flex-wrap: wrap; gap: 8px;">';
+        for (let [type, data] of Object.entries(dist)) {
+            let badgeClass = '';
+            if (type.toLowerCase().includes('bug')) badgeClass = 'Bug';
+            else if (type.toLowerCase().includes('story')) badgeClass = 'Story';
+            else if (type.toLowerCase().includes('task')) badgeClass = 'Task';
+            else if (type.toLowerCase().includes('epic')) badgeClass = 'Epic';
+            else if (type.toLowerCase().includes('spike')) badgeClass = 'Spike';
+            html += `<span class="type-badge ${badgeClass}">${type}: ${data.count} (${data.percent}%)</span>`;
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function renderFlowLoad(load, total) {
+        if (!Object.keys(load).length) return 'Нет активных задач';
+        let html = '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">';
+        for (let [type, count] of Object.entries(load)) {
+            let badgeClass = '';
+            if (type.toLowerCase().includes('bug')) badgeClass = 'Bug';
+            else if (type.toLowerCase().includes('story')) badgeClass = 'Story';
+            else if (type.toLowerCase().includes('task')) badgeClass = 'Task';
+            else if (type.toLowerCase().includes('epic')) badgeClass = 'Epic';
+            else if (type.toLowerCase().includes('spike')) badgeClass = 'Spike';
+            html += `<span class="type-badge ${badgeClass}">${type}: ${count}</span>`;
+        }
+        html += `</div><div style="font-weight: 600; margin-top: 8px;">📊 Всего незавершённых задач: ${total}</div>`;
+        return html;
+    }
+
+    function renderTeams() {
+        const container = document.getElementById('teamsList');
+        if (!container) return;
+        if (teams.length === 0) { container.innerHTML = '<div class="card">Нет команд. Нажмите "Новая команда"</div>'; return; }
+        container.innerHTML = '';
+        teams.forEach(team => {
+            const m = team.metrics || {};
+            const statusColor = getStatusColor(m);
+            container.innerHTML += `
+                <div class="team-card">
+                    <div class="team-status-bar" style="background:${statusColor};"></div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <div class="team-name">${escapeHtml(team.name)}</div>
+                            <div class="team-desc">${escapeHtml(team.description || '')}</div>
+                            <div style="font-size:13px; margin-top:6px;">👥 ${team.members||1} участников | 📋 PO: ${escapeHtml(team.productOwner||'—')}</div>
+                        </div>
+                        <div><button onclick="editTeam('${team.id}')">✏️ Ред.</button> <button class="danger" onclick="deleteTeam('${team.id}')">🗑️</button></div>
+                    </div>
+                    <div class="grid-5" style="margin-top:20px;">
+                        <div class="metric"><div class="metric-label">📊 Flow Distribution</div><div style="font-size:13px;">${renderFlowDistribution(m.flowDistribution || {})}</div></div>
+                        <div class="metric"><div class="metric-label">⚡ Flow Velocity (средняя)</div><div class="metric-value">${m.avgFlowVelocitySP || 0} SP</div><div>${m.avgFlowVelocityTasks || 0} задач</div></div>
+                        <div class="metric"><div class="metric-label">⚡ Flow Velocity (последний спринт)</div><div class="metric-value">${m.lastSprintVelocitySP || 0} SP</div><div>${m.lastSprintVelocityTasks || 0} задач</div></div>
+                        <div class="metric"><div class="metric-label">⏱️ Flow Time</div><div class="metric-value">${m.flowTime || 0}</div><div class="metric-label">дней</div></div>
+                        <div class="metric"><div class="metric-label">📦 Flow Load</div><div style="font-size:13px;">${renderFlowLoad(m.flowLoad || {}, m.flowLoadTotal || 0)}</div></div>
+                        <div class="metric"><div class="metric-label">🎯 Flow Predictability</div><div class="metric-value">${m.flowPredictability || 0}%</div></div>
+                    </div>
+                    <div class="dropzone" onclick="showFileManager('${team.id}')">📁 Управление файлами (${team.csvFiles?.length || 0}/30)</div>
+                </div>`;
+        });
+    }
+
+    function updateMetricsTeamSelect() { const sel = document.getElementById('metricsTeamSelect'); if (!sel) return; sel.innerHTML = '<option value="">-- Выберите команду --</option>'; teams.forEach(t => sel.innerHTML += `<option value="${t.id}">${escapeHtml(t.name)}</option>`); }
+    
+    function destroyAllCharts() {
+        if (velocityChart) { velocityChart.destroy(); velocityChart = null; }
+        if (typeChart) { typeChart.destroy(); typeChart = null; }
+        if (loadChart) { loadChart.destroy(); loadChart = null; }
+        if (flowTimeChart) { flowTimeChart.destroy(); flowTimeChart = null; }
+        if (predictabilityChart) { predictabilityChart.destroy(); predictabilityChart = null; }
+    }
+
+    function renderCharts(team) {
+        const container = document.getElementById('chartsContainer');
+        if (!container) return;
+        
+        const m = team.metrics || {};
+        const sprintCount = m.sprintVelocitiesSP?.length || 0;
+        const sprintLabels = sprintCount ? Array.from({length: sprintCount}, (_, i) => `Спринт ${i+1}`) : [];
+        
+        container.innerHTML = `
+            <div class="chart-card">
+                <div class="chart-title">⚡ Flow Velocity (Скорость потока)</div>
+                <canvas id="velocityChartCanvas"></canvas>
+                <div class="metric-label" style="text-align:center; margin-top:8px;">Динамика скорости по спринтам (SP и количество задач)</div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">📊 Flow Distribution (Распределение потока)</div>
+                <canvas id="typeChartCanvas"></canvas>
+                <div class="metric-label" style="text-align:center; margin-top:8px;">Распределение задач по типам</div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">📦 Flow Load (Загрузка потока / WIP)</div>
+                <canvas id="loadChartCanvas"></canvas>
+                <div class="metric-label" style="text-align:center; margin-top:8px;">Незавершённые задачи по типам</div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">⏱️ Flow Time (Время потока)</div>
+                <canvas id="flowTimeChartCanvas"></canvas>
+                <div class="metric-label" style="text-align:center; margin-top:8px;">Время выполнения каждой задачи (дни)</div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">🎯 Flow Predictability (Прогнозируемость потока)</div>
+                <canvas id="predictabilityChartCanvas"></canvas>
+                <div class="metric-label" style="text-align:center; margin-top:8px;">Процент выполненных задач по спринтам</div>
+            </div>
+        `;
+        
+        // 1. Velocity Chart (линейный график скорости)
+        if (sprintCount > 0) {
+            const ctx = document.getElementById('velocityChartCanvas').getContext('2d');
+            velocityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sprintLabels,
+                    datasets: [
+                        { label: 'Скорость (SP)', data: m.sprintVelocitiesSP, borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,0.1)', fill: true, tension: 0.3, yAxisID: 'y' },
+                        { label: 'Скорость (задачи)', data: m.sprintVelocitiesTasks, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3, yAxisID: 'y1' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { tooltip: { mode: 'index', intersect: false } }, scales: { y: { title: { display: true, text: 'Story Points' } }, y1: { position: 'right', title: { display: true, text: 'Количество задач' }, grid: { drawOnChartArea: false } } } }
+            });
+        } else {
+            document.getElementById('velocityChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет данных для отображения графика скорости</div>';
+        }
+        
+        // 2. Distribution Chart (круговая диаграмма)
+        if (m.flowDistribution && Object.keys(m.flowDistribution).length > 0) {
+            const ctx = document.getElementById('typeChartCanvas').getContext('2d');
+            typeChart = new Chart(ctx, {
+                type: 'pie',
+                data: { labels: Object.keys(m.flowDistribution), datasets: [{ data: Object.values(m.flowDistribution).map(v=>v.count), backgroundColor: ['#4f46e5','#7c3aed','#f59e0b','#10b981','#ef4444','#8b5cf6'] }] },
+                options: { responsive: true, plugins: { legend: { position: 'right' } } }
+            });
+        } else {
+            document.getElementById('typeChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет данных для отображения распределения</div>';
+        }
+        
+        // 3. Load Chart (столбчатая диаграмма WIP)
+        if (m.flowLoad && Object.keys(m.flowLoad).length > 0) {
+            const ctx = document.getElementById('loadChartCanvas').getContext('2d');
+            loadChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: Object.keys(m.flowLoad), datasets: [{ label: 'Незавершённые задачи (WIP)', data: Object.values(m.flowLoad), backgroundColor: '#f59e0b', borderRadius: 8 }] },
+                options: { responsive: true, plugins: { legend: { position: 'top' } } }
+            });
+        } else {
+            document.getElementById('loadChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет незавершённых задач</div>';
+        }
+        
+        // 4. Flow Time Chart (точечная диаграмма scatter plot)
+        if (m.allFlowTimes && m.allFlowTimes.length > 0) {
+            const scatterData = m.allFlowTimes.map((value, index) => ({ x: index + 1, y: value }));
+            const ctx = document.getElementById('flowTimeChartCanvas').getContext('2d');
+            flowTimeChart = new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets: [{ label: 'Время выполнения задачи (дни)', data: scatterData, backgroundColor: '#4f46e5', pointRadius: 6, pointHoverRadius: 8 }] },
+                options: { responsive: true, scales: { y: { title: { display: true, text: 'Flow Time (дни)' }, beginAtZero: true }, x: { title: { display: true, text: 'Задача №' } } }, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.raw.y} дней` } } } }
+            });
+        } else {
+            document.getElementById('flowTimeChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет данных о времени выполнения задач</div>';
+        }
+        
+        // 5. Predictability Chart (линейный график)
+        if (sprintCount > 0) {
+            const ctx = document.getElementById('predictabilityChartCanvas').getContext('2d');
+            predictabilityChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: sprintLabels, datasets: [{ label: 'Прогнозируемость (%)', data: m.sprintPredictabilities, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.3 }] },
+                options: { responsive: true, scales: { y: { title: { display: true, text: 'Процент (%)' }, min: 0, max: 100 } }, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.raw}%` } } } }
+            });
+        } else {
+            document.getElementById('predictabilityChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет данных для отображения прогнозируемости</div>';
+        }
+    }
+
+    function showDetailedMetrics(teamId) {
+        const team = teams.find(t => t.id === teamId); if (!team) return;
+        const m = team.metrics || {};
+        const container = document.getElementById('metricsDetails'); if (!container) return;
+        destroyAllCharts();
+        
+        container.innerHTML = `
+            <h3 style="margin-bottom: 16px;">${escapeHtml(team.name)} — детальные Flow Metrics</h3>
+            <div class="grid-5">
+                <div class="metric"><div class="metric-label">Flow Distribution</div><div>${renderFlowDistribution(m.flowDistribution || {})}</div></div>
+                <div class="metric"><div class="metric-label">Flow Velocity (средняя)</div><div class="metric-value">${m.avgFlowVelocitySP || 0} SP</div><div>${m.avgFlowVelocityTasks || 0} задач</div></div>
+                <div class="metric"><div class="metric-label">Flow Velocity (последний)</div><div class="metric-value">${m.lastSprintVelocitySP || 0} SP</div><div>${m.lastSprintVelocityTasks || 0} задач</div></div>
+                <div class="metric"><div class="metric-label">Flow Time</div><div class="metric-value">${m.flowTime || 0} дней</div></div>
+                <div class="metric"><div class="metric-label">Flow Load</div><div>${renderFlowLoad(m.flowLoad || {}, m.flowLoadTotal || 0)}</div></div>
+                <div class="metric"><div class="metric-label">Flow Predictability</div><div class="metric-value">${m.flowPredictability || 0}%</div></div>
+            </div>`;
+        
+        renderCharts(team);
+        
+        let recHtml = `<div class="recommendation"><strong>💡 Рекомендации на основе Flow Metrics</strong><br><br>`;
+        if (m.avgFlowVelocitySP < 20) recHtml += `⚠️ <strong>Низкая скорость</strong> (менее 20 SP). Проверьте наличие блокеров и ограничьте WIP.<br><br>`;
+        if (m.flowPredictability < 60) recHtml += `📉 <strong>Низкая предсказуемость</strong> (менее 60%). Улучшите планирование спринта.<br><br>`;
+        if (m.flowTime > 10) recHtml += `⏱️ <strong>Высокое время выполнения</strong> (более 10 дней). Дробьте задачи на более мелкие.<br><br>`;
+        let loadSum = m.flowLoadTotal || 0;
+        if (loadSum > 20) recHtml += `📦 <strong>Высокий Flow Load (WIP)</strong> (${loadSum} задач). Ограничьте количество задач в работе.<br><br>`;
+        if (recHtml === `<div class="recommendation"><strong>💡 Рекомендации на основе Flow Metrics</strong><br><br>`) recHtml += `✅ Все метрики в норме. Команда демонстрирует хороший поток доставки.<br><br>`;
+        recHtml += `</div>`;
+        document.getElementById('recommendationsBlock').innerHTML = recHtml;
+    }
+
+    document.getElementById('metricsTeamSelect')?.addEventListener('change', (e) => { if (e.target.value) showDetailedMetrics(e.target.value); else { document.getElementById('metricsDetails').innerHTML = ''; document.getElementById('recommendationsBlock').innerHTML = ''; destroyAllCharts(); document.getElementById('chartsContainer').innerHTML = ''; } });
+    
+    function showTeamModal(team = null) {
+        const isEdit = !!team;
+        const modal = document.createElement('div'); modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${isEdit ? '✏️ Редактировать команду' : '➕ Новая команда'}</h3>
+                <div><label>Название команды *</label><input type="text" id="modalTeamName" value="${escapeHtml(team ? team.name : '')}" placeholder="Например: Team Alpha"></div>
+                <div><label>Краткое описание</label><textarea id="modalTeamDesc" rows="2" placeholder="Чем занимается команда...">${escapeHtml(team ? team.description || '' : '')}</textarea></div>
+                <div><label>Количество участников</label><input type="number" id="modalTeamMembers" value="${team ? team.members || 1 : 1}" min="1"></div>
+                <div><label>Product Owner</label><input type="text" id="modalTeamPO" value="${escapeHtml(team ? team.productOwner || '' : '')}" placeholder="Имя PO"></div>
+                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+                    <button id="modalCancelBtn" style="background:#e2e8f0; color:#1e293b;">Отмена</button>
+                    <button id="modalSaveBtn">${isEdit ? 'Сохранить' : 'Создать'}</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        document.getElementById('modalCancelBtn').onclick = () => modal.remove();
+        document.getElementById('modalSaveBtn').onclick = () => {
+            const name = document.getElementById('modalTeamName').value.trim();
+            if (!name) { alert('Введите название команды'); return; }
+            const teamData = {
+                id: isEdit ? team.id : Date.now().toString(),
+                name,
+                description: document.getElementById('modalTeamDesc').value,
+                members: parseInt(document.getElementById('modalTeamMembers').value) || 1,
+                productOwner: document.getElementById('modalTeamPO').value,
+                metrics: team?.metrics || {},
+                csvFiles: team?.csvFiles || [],
+                csvData: team?.csvData || [],
+                sprintMetrics: team?.sprintMetrics || []
+            };
+            if (isEdit) { const idx = teams.findIndex(t => t.id === team.id); if (idx !== -1) teams[idx] = teamData; }
+            else teams.push(teamData);
+            saveTeams(); modal.remove();
+        };
+    }
+    window.editTeam = (id) => { const team = teams.find(t => t.id === id); if (team) showTeamModal(team); };
+    window.deleteTeam = (id) => { if (confirm('Удалить команду?')) { teams = teams.filter(t => t.id !== id); saveTeams(); } };
+    document.getElementById('addTeamBtn')?.addEventListener('click', () => showTeamModal());
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => { document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active')); btn.classList.add('active'); document.getElementById(btn.dataset.tab).classList.add('active'); }));
+    function escapeHtml(s) { return s ? s.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])) : ''; }
+    loadTeams();
+</script>
+</body>
+</html>
