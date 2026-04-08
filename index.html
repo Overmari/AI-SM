@@ -566,7 +566,12 @@
         let filesHtml = team.uploadedFiles?.length ? team.uploadedFiles.map((file, idx) => `<div class="file-item">📄 ${escapeHtml(file.name)} <span class="file-type-badge ${file.type}">${file.type}</span> <button class="danger" onclick="window.deleteFile('${teamId}', ${idx})">Удалить</button></div>`).join('') : '<div>Нет файлов</div>';
         modal.innerHTML = `<div class="modal-content"><h3>📁 Файлы: ${escapeHtml(team.name)}</h3>${filesHtml}<div class="dropzone" onclick="document.getElementById('fileInput_modal').click()">➕ Добавить файл</div><input type="file" id="fileInput_modal" accept=".csv,.xlsx,.xls,image/*" style="display:none"><button class="secondary" onclick="modal.remove()">Закрыть</button></div>`;
         document.body.appendChild(modal);
-        document.getElementById('fileInput_modal').onchange = async (e) => { if (e.target.files[0]) { await uploadFile(teamId, e.target.files[0]); modal.remove(); showFileManager(teamId); } };
+        document.getElementById('fileInput_modal').onchange = async (e) => {
+            if (e.target.files[0]) {
+                await uploadFile(teamId, e.target.files[0]);
+                modal.remove();
+            }
+        };
     }
 
     window.deleteFile = async function(teamId, idx) {
