@@ -2,21 +2,24 @@
 export default async function handler(req, res) {
     // Разрешаем CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Метод не разрешён' });
+        return res.status(405).json({ error: 'Метод не разрешён. Используйте POST.' });
     }
 
-    const { prompt, context, metrics, questionType } = req.body;
+    const { prompt, questionType, metrics, context } = req.body;
+    
+    // Если нет промпта и нет метрик, возвращаем ошибку
     if (!prompt && !metrics) {
         return res.status(400).json({ error: 'Не указан запрос или метрики' });
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-        return res.status(500).json({ error: 'API ключ Anthropic не настроен' });
+        console.error('ANTHROPIC_API_KEY not set');
+        return res.status(500).json({ error: 'API ключ Anthropic не настроен. Добавьте переменную ANTHROPIC_API_KEY в Vercel.' });
     }
 
     // Формируем системный промпт для Claude
@@ -28,7 +31,7 @@ export default async function handler(req, res) {
     let userPrompt = prompt;
 
     // Если переданы метрики команды
-    if (metrics) {
+    if (metrics && (questionType === 'analyze' || questionType === 'bottleneck' || questionType === 'retro' || questionType === 'predict')) {
         const metricsText = `
 📊 Flow Distribution: ${JSON.stringify(metrics.flowDistribution || {})}
 ⚡ Flow Velocity (средняя): ${metrics.avgFlowVelocitySP || 0} SP, ${metrics.avgFlowVelocityTasks || 0} задач
@@ -72,9 +75,9 @@ ${metricsText}
 1. Какой ожидается скорость в следующем спринте?
 2. Какие риски могут повлиять на прогноз?
 3. Что можно сделать для улучшения прогнозируемости?`;
-        } else if (context) {
-            userPrompt = `Контекст о команде: ${context}\n\nВопрос: ${prompt}`;
         }
+    } else if (context && prompt) {
+        userPrompt = `Контекст о команде: ${context}\n\nВопрос: ${prompt}`;
     }
 
     try {
@@ -105,6 +108,6 @@ ${metricsText}
         res.json({ success: true, analysis });
     } catch (error) {
         console.error('Server error:', error);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        res.status(500).json({ error: 'Ошибка сервера: ' + error.message });
     }
 }
