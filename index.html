@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scrum Master Assistant — Flow Metrics + Groq AI</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -194,6 +195,11 @@
             background: #ef4444;
         }
 
+        button.secondary {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+
         .modal {
             position: fixed;
             top: 0;
@@ -337,6 +343,54 @@
             to { transform: rotate(360deg); }
         }
 
+        /* Стилизованное поле ввода */
+        .ai-prompt-container {
+            margin-bottom: 20px;
+        }
+
+        .ai-prompt-container label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1e293b;
+        }
+
+        .ai-prompt-textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 20px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            transition: all 0.2s ease;
+            background: #fafcff;
+        }
+
+        .ai-prompt-textarea:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+        }
+
+        .ai-prompt-textarea::placeholder {
+            color: #94a3b8;
+        }
+
+        .file-type-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .file-type-badge.csv { background: #dbeafe; color: #1d4ed8; }
+        .file-type-badge.excel { background: #dcfce7; color: #15803d; }
+        .file-type-badge.image { background: #fef3c7; color: #b45309; }
+
         @media (max-width: 768px) {
             .grid-5 { grid-template-columns: 1fr; }
             .tab-btn { padding: 6px 16px; font-size: 12px; }
@@ -381,24 +435,28 @@
     <div id="ai" class="panel">
         <div class="card">
             <div class="card-header">🤖 AI-ассистент на базе Groq (Llama 3.3)</div>
-            <p style="margin-bottom: 16px; color: #475569;">ИИ анализирует ваши метрики и даёт профессиональные рекомендации.</p>
+            <p style="margin-bottom: 16px; color: #475569;">ИИ анализирует ваши метрики, загруженные файлы и даёт профессиональные рекомендации.</p>
             
             <div class="grid-5" style="margin-bottom: 20px;">
                 <button id="aiQuickMetricsBtn">📊 Анализ метрик</button>
                 <button id="aiQuickBottleneckBtn">🔍 Узкие горлышки</button>
                 <button id="aiQuickRetroBtn">🔄 Ретроспектива</button>
                 <button id="aiQuickPredictBtn">📈 Прогноз</button>
+                <button id="aiAnalyzeFilesBtn">📁 Анализ загруженных файлов</button>
             </div>
             
             <select id="aiTeamSelect" class="select-team" style="margin-bottom: 16px;">
                 <option value="">-- Выберите команду --</option>
             </select>
             
-            <textarea id="aiPrompt" rows="3" placeholder="Или напишите свой вопрос..." style="margin-bottom: 16px;"></textarea>
+            <div class="ai-prompt-container">
+                <label>💬 Задайте вопрос Groq</label>
+                <textarea id="aiPrompt" class="ai-prompt-textarea" rows="3" placeholder="Например:&#10;• Как улучшить предсказуемость команды?&#10;• Что делать при высоком Flow Time?&#10;• Проанализируй загруженные файлы и дай рекомендации..."></textarea>
+            </div>
             
             <div style="display: flex; gap: 12px; justify-content: flex-end;">
                 <button id="aiSendBtn">🚀 Отправить запрос</button>
-                <button id="aiClearBtn" style="background: #e2e8f0; color: #1e293b;">Очистить</button>
+                <button id="aiClearBtn" class="secondary">Очистить</button>
             </div>
             
             <div id="aiResponse" class="recommendation" style="margin-top: 20px; background: #f8fafc; border-left-color: #4f46e5;">
@@ -418,6 +476,129 @@
     function getStatusColor(metrics) { const v = metrics.avgFlowVelocitySP || 0; const p = metrics.flowPredictability || 0; if (v > 20 && p > 75) return '#10b981'; if (v > 15 && p > 55) return '#f59e0b'; return '#ef4444'; }
     function parseDate(dateStr) { if (!dateStr) return null; let d = new Date(dateStr); if (!isNaN(d)) return d; let parts = dateStr.match(/(\d+)[\/\-\.](\d+)[\/\-\.](\d+)/); if (parts) return new Date(parts[3], parts[2]-1, parts[1]); return null; }
     function daysBetween(d1, d2) { if (!d1 || !d2) return null; return Math.abs(d2 - d1) / (1000 * 60 * 60 * 24); }
+
+    // Функция для парсинга Excel файла
+    async function parseExcelFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                resolve(jsonData);
+            };
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    // Функция для конвертации изображения в base64 для отправки в Groq
+    async function imageToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function uploadFile(teamId, file) {
+        const team = teams.find(t => t.id === teamId);
+        if (!team) return;
+        if ((team.uploadedFiles?.length || 0) >= 30) { alert('Максимум 30 файлов'); return; }
+        
+        let parsedData = null;
+        let fileType = 'unknown';
+        
+        if (file.name.endsWith('.csv')) {
+            fileType = 'csv';
+            const text = await file.text();
+            const lines = text.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                const vals = lines[i].split(',');
+                if (vals.length >= headers.length && vals.some(v => v && v.trim())) {
+                    let row = {};
+                    headers.forEach((h, idx) => row[h] = vals[idx]?.trim() || '');
+                    data.push(row);
+                }
+            }
+            parsedData = data;
+            
+            // Обновляем метрики для CSV
+            const sprintMetrics = parseSingleSprint(data);
+            if (!team.sprintMetrics) team.sprintMetrics = [];
+            team.sprintMetrics.push(sprintMetrics);
+            const aggregated = aggregateFlowMetrics(team.sprintMetrics);
+            team.metrics = aggregated;
+            
+        } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+            fileType = 'excel';
+            parsedData = await parseExcelFile(file);
+        } else if (file.type.startsWith('image/')) {
+            fileType = 'image';
+            parsedData = await imageToBase64(file);
+        }
+        
+        if (!team.uploadedFiles) team.uploadedFiles = [];
+        if (!team.fileData) team.fileData = [];
+        team.uploadedFiles.push({ name: file.name, type: fileType });
+        team.fileData.push(parsedData);
+        
+        saveTeams();
+    }
+
+    function showFileManager(teamId) {
+        const team = teams.find(t => t.id === teamId);
+        if (!team) return;
+        const modal = document.createElement('div'); modal.className = 'modal';
+        let filesHtml = team.uploadedFiles?.length ? team.uploadedFiles.map((file, idx) => {
+            let typeClass = '';
+            if (file.type === 'csv') typeClass = 'csv';
+            else if (file.type === 'excel') typeClass = 'excel';
+            else if (file.type === 'image') typeClass = 'image';
+            return `<div class="file-item">
+                        <span class="file-name">📄 ${escapeHtml(file.name)}</span>
+                        <span class="file-type-badge ${typeClass}">${file.type.toUpperCase()}</span>
+                        <button class="danger" style="padding: 4px 12px; margin-left: 10px;" onclick="window.deleteFile('${teamId}', ${idx})">Удалить</button>
+                    </div>`;
+        }).join('') : '<div style="text-align: center; padding: 20px;">Нет файлов</div>';
+        
+        modal.innerHTML = `<div class="modal-content"><h3>📁 Управление файлами</h3><div style="margin-bottom: 8px; color:#475569;">Команда: ${escapeHtml(team.name)}</div><div class="file-list">${filesHtml}</div><div class="dropzone" style="margin-top: 16px;" onclick="document.getElementById('fileInput_modal').click()">📁 Добавить файл (CSV, Excel, изображение)</div><input type="file" id="fileInput_modal" accept=".csv,.xlsx,.xls,image/*" style="display: none;"><div style="display: flex; justify-content: flex-end; margin-top: 20px;"><button id="closeFileModalBtn" class="secondary">Закрыть</button></div></div>`;
+        document.body.appendChild(modal);
+        document.getElementById('fileInput_modal').onchange = async (e) => { if (e.target.files[0]) { await uploadFile(teamId, e.target.files[0]); modal.remove(); showFileManager(teamId); } };
+        document.getElementById('closeFileModalBtn').onclick = () => modal.remove();
+    }
+    
+    window.deleteFile = async function(teamId, fileIndex) {
+        if (confirm('Удалить файл?')) {
+            const team = teams.find(t => t.id === teamId);
+            if (team && team.uploadedFiles && team.uploadedFiles[fileIndex]) {
+                team.uploadedFiles.splice(fileIndex, 1);
+                team.fileData.splice(fileIndex, 1);
+                if (team.uploadedFiles.some(f => f.type === 'csv')) {
+                    // Пересчитываем метрики только если остались CSV
+                    const csvIndices = [];
+                    team.uploadedFiles.forEach((f, idx) => { if (f.type === 'csv') csvIndices.push(idx); });
+                    const sprintMetrics = [];
+                    for (let idx of csvIndices) {
+                        const data = team.fileData[idx];
+                        if (data && Array.isArray(data)) {
+                            sprintMetrics.push(parseSingleSprint(data));
+                        }
+                    }
+                    team.sprintMetrics = sprintMetrics;
+                    const aggregated = aggregateFlowMetrics(sprintMetrics);
+                    team.metrics = aggregated;
+                }
+                saveTeams();
+                const modal = document.querySelector('.modal'); if (modal) modal.remove();
+                showFileManager(teamId);
+            }
+        }
+    };
 
     function parseSingleSprint(data) {
         let typeCount = {};
@@ -524,63 +705,6 @@
         };
     }
 
-    async function uploadCSV(teamId, file) {
-        const team = teams.find(t => t.id === teamId);
-        if (!team) return;
-        if ((team.csvFiles?.length || 0) >= 30) { alert('Максимум 30 файлов'); return; }
-        
-        const text = await file.text();
-        const lines = text.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim());
-        const data = [];
-        for (let i = 1; i < lines.length; i++) {
-            const vals = lines[i].split(',');
-            if (vals.length >= headers.length && vals.some(v => v && v.trim())) {
-                let row = {}; headers.forEach((h, idx) => row[h] = vals[idx]?.trim() || '');
-                data.push(row);
-            }
-        }
-        
-        const sprintMetrics = parseSingleSprint(data);
-        if (!team.csvData) team.csvData = [];
-        if (!team.sprintMetrics) team.sprintMetrics = [];
-        team.csvData.push(data);
-        team.sprintMetrics.push(sprintMetrics);
-        if (!team.csvFiles) team.csvFiles = [];
-        team.csvFiles.push(file.name);
-        
-        const aggregated = aggregateFlowMetrics(team.sprintMetrics);
-        team.metrics = aggregated;
-        saveTeams();
-    }
-
-    function showFileManager(teamId) {
-        const team = teams.find(t => t.id === teamId);
-        if (!team) return;
-        const modal = document.createElement('div'); modal.className = 'modal';
-        let filesHtml = team.csvFiles?.length ? team.csvFiles.map((fileName, idx) => `<div class="file-item"><span class="file-name">📄 ${escapeHtml(fileName)}</span><button class="danger" style="padding: 4px 12px;" onclick="window.deleteFile('${teamId}', ${idx})">Удалить</button></div>`).join('') : '<div style="text-align: center; padding: 20px;">Нет файлов</div>';
-        modal.innerHTML = `<div class="modal-content"><h3>📁 Управление файлами</h3><div style="margin-bottom: 8px; color:#475569;">Команда: ${escapeHtml(team.name)}</div><div class="file-list">${filesHtml}</div><div class="dropzone" style="margin-top: 16px;" onclick="document.getElementById('fileInput_modal').click()">📁 Добавить CSV</div><input type="file" id="fileInput_modal" accept=".csv" style="display: none;"><div style="display: flex; justify-content: flex-end; margin-top: 20px;"><button id="closeFileModalBtn" style="background:#e2e8f0; color:#1e293b;">Закрыть</button></div></div>`;
-        document.body.appendChild(modal);
-        document.getElementById('fileInput_modal').onchange = async (e) => { if (e.target.files[0]) { await uploadCSV(teamId, e.target.files[0]); modal.remove(); showFileManager(teamId); } };
-        document.getElementById('closeFileModalBtn').onclick = () => modal.remove();
-    }
-    
-    window.deleteFile = async function(teamId, fileIndex) {
-        if (confirm('Удалить файл?')) {
-            const team = teams.find(t => t.id === teamId);
-            if (team && team.csvFiles && team.csvFiles[fileIndex]) {
-                team.csvFiles.splice(fileIndex, 1);
-                team.csvData.splice(fileIndex, 1);
-                team.sprintMetrics.splice(fileIndex, 1);
-                const aggregated = aggregateFlowMetrics(team.sprintMetrics);
-                team.metrics = aggregated;
-                saveTeams();
-                const modal = document.querySelector('.modal'); if (modal) modal.remove();
-                showFileManager(teamId);
-            }
-        }
-    };
-
     function renderFlowDistribution(dist) {
         if (!Object.keys(dist).length) return 'Нет данных';
         let html = '<div style="display: flex; flex-wrap: wrap; gap: 8px;">';
@@ -640,7 +764,7 @@
                         <div class="metric"><div class="metric-label">📦 Flow Load</div><div style="font-size:13px;">${renderFlowLoad(m.flowLoad || {}, m.flowLoadTotal || 0)}</div></div>
                         <div class="metric"><div class="metric-label">🎯 Flow Predictability</div><div class="metric-value">${m.flowPredictability || 0}%</div></div>
                     </div>
-                    <div class="dropzone" onclick="showFileManager('${team.id}')">📁 Управление файлами (${team.csvFiles?.length || 0}/30)</div>
+                    <div class="dropzone" onclick="showFileManager('${team.id}')">📁 Управление файлами (${team.uploadedFiles?.length || 0}/30)</div>
                 </div>`;
         });
     }
@@ -692,7 +816,6 @@
             </div>
         `;
         
-        // Velocity Chart
         if (sprintCount > 0) {
             const ctx = document.getElementById('velocityChartCanvas').getContext('2d');
             velocityChart = new Chart(ctx, {
@@ -706,11 +829,8 @@
                 },
                 options: { responsive: true, maintainAspectRatio: true, plugins: { tooltip: { mode: 'index', intersect: false } }, scales: { y: { title: { display: true, text: 'Story Points' } }, y1: { position: 'right', title: { display: true, text: 'Количество задач' }, grid: { drawOnChartArea: false } } } }
             });
-        } else {
-            document.getElementById('velocityChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет данных для отображения графика скорости</div>';
         }
         
-        // Distribution Chart
         if (m.flowDistribution && Object.keys(m.flowDistribution).length > 0) {
             const ctx = document.getElementById('typeChartCanvas').getContext('2d');
             typeChart = new Chart(ctx, {
@@ -718,11 +838,8 @@
                 data: { labels: Object.keys(m.flowDistribution), datasets: [{ data: Object.values(m.flowDistribution).map(v=>v.count), backgroundColor: ['#4f46e5','#7c3aed','#f59e0b','#10b981','#ef4444','#8b5cf6'] }] },
                 options: { responsive: true, plugins: { legend: { position: 'right' } } }
             });
-        } else {
-            document.getElementById('typeChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет данных для отображения распределения</div>';
         }
         
-        // Load Chart
         if (m.flowLoad && Object.keys(m.flowLoad).length > 0) {
             const ctx = document.getElementById('loadChartCanvas').getContext('2d');
             loadChart = new Chart(ctx, {
@@ -730,11 +847,8 @@
                 data: { labels: Object.keys(m.flowLoad), datasets: [{ label: 'Незавершённые задачи (WIP)', data: Object.values(m.flowLoad), backgroundColor: '#f59e0b', borderRadius: 8 }] },
                 options: { responsive: true, plugins: { legend: { position: 'top' } } }
             });
-        } else {
-            document.getElementById('loadChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет незавершённых задач</div>';
         }
         
-        // Flow Time Chart (scatter plot)
         if (m.allFlowTimes && m.allFlowTimes.length > 0) {
             const scatterData = m.allFlowTimes.map((value, index) => ({ x: index + 1, y: value }));
             const ctx = document.getElementById('flowTimeChartCanvas').getContext('2d');
@@ -743,11 +857,8 @@
                 data: { datasets: [{ label: 'Время выполнения задачи (дни)', data: scatterData, backgroundColor: '#4f46e5', pointRadius: 6, pointHoverRadius: 8 }] },
                 options: { responsive: true, scales: { y: { title: { display: true, text: 'Flow Time (дни)' }, beginAtZero: true }, x: { title: { display: true, text: 'Задача №' } } }, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.raw.y} дней` } } } }
             });
-        } else {
-            document.getElementById('flowTimeChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет данных о времени выполнения задач</div>';
         }
         
-        // Predictability Chart
         if (sprintCount > 0) {
             const ctx = document.getElementById('predictabilityChartCanvas').getContext('2d');
             predictabilityChart = new Chart(ctx, {
@@ -755,8 +866,6 @@
                 data: { labels: sprintLabels, datasets: [{ label: 'Прогнозируемость (%)', data: m.sprintPredictabilities, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.3 }] },
                 options: { responsive: true, scales: { y: { title: { display: true, text: 'Процент (%)' }, min: 0, max: 100 } }, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.raw}%` } } } }
             });
-        } else {
-            document.getElementById('predictabilityChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет данных для отображения прогнозируемости</div>';
         }
     }
 
@@ -792,26 +901,106 @@
         document.getElementById('recommendationsBlock').innerHTML = recHtml;
     }
 
-    // === ФУНКЦИЯ ДЛЯ ВЫЗОВА GROQ API ===
+    // Функция для подготовки данных файлов для отправки в Groq
+    function prepareFilesDataForAI(team) {
+        if (!team.uploadedFiles || team.uploadedFiles.length === 0) return null;
+        
+        let filesDescription = '';
+        for (let i = 0; i < team.uploadedFiles.length; i++) {
+            const file = team.uploadedFiles[i];
+            const fileData = team.fileData[i];
+            filesDescription += `\n--- Файл ${i+1}: ${file.name} (${file.type.toUpperCase()}) ---\n`;
+            
+            if (file.type === 'csv' && fileData && Array.isArray(fileData)) {
+                const sample = fileData.slice(0, 5);
+                filesDescription += `Данные CSV (первые 5 строк):\n${JSON.stringify(sample, null, 2)}\n`;
+                filesDescription += `Всего строк: ${fileData.length}\n`;
+            } else if (file.type === 'excel' && fileData && Array.isArray(fileData)) {
+                const sample = fileData.slice(0, 5);
+                filesDescription += `Данные Excel (первые 5 строк):\n${JSON.stringify(sample, null, 2)}\n`;
+                filesDescription += `Всего строк: ${fileData.length}\n`;
+            } else if (file.type === 'image') {
+                filesDescription += `Изображение загружено (проанализируйте его визуально)\n`;
+            }
+        }
+        return filesDescription;
+    }
+
+    // Функция для вызова Groq API с поддержкой анализа файлов
     async function callGroqAPI(prompt, questionType, teamId) {
         const responseDiv = document.getElementById('aiResponse');
         responseDiv.innerHTML = '<div class="ai-loading"></div> Groq анализирует...';
         
         let metrics = null;
         let teamName = '';
+        let filesData = null;
+        
         if (teamId) {
             const team = teams.find(t => t.id === teamId);
             if (team) {
                 teamName = team.name;
                 metrics = team.metrics;
+                filesData = prepareFilesDataForAI(team);
             }
+        }
+        
+        let finalPrompt = prompt;
+        
+        if (questionType === 'analyze' && metrics) {
+            finalPrompt = `Проанализируй метрики команды ${teamName}:
+Средняя скорость: ${metrics.avgFlowVelocitySP || 0} SP (${metrics.avgFlowVelocityTasks || 0} задач)
+Время выполнения: ${metrics.flowTime || 0} дней
+Предсказуемость: ${metrics.flowPredictability || 0}%
+WIP: ${metrics.flowLoadTotal || 0}
+
+Дай 3-5 конкретных рекомендаций по улучшению процессов.`;
+        } 
+        else if (questionType === 'bottleneck' && metrics) {
+            finalPrompt = `На основе метрик команды ${teamName} найди узкие горлышки:
+Скорость: ${metrics.avgFlowVelocitySP || 0} SP
+Flow Time: ${metrics.flowTime || 0} дней
+WIP: ${metrics.flowLoadTotal || 0}
+Предсказуемость: ${metrics.flowPredictability || 0}%
+
+Ответь на русском языке:
+1. Где главное узкое место?
+2. Как его устранить? (ссылайся на теорию ограничений Голдратта)`;
+        }
+        else if (questionType === 'retro' && metrics) {
+            finalPrompt = `На основе метрик команды ${teamName} предложи сценарий ретроспективы:
+Скорость: ${metrics.avgFlowVelocitySP || 0} SP
+Предсказуемость: ${metrics.flowPredictability || 0}%
+
+Предложи на русском языке:
+1. Тему ретроспективы
+2. 3-4 упражнения для команды
+3. Тайминг (60-90 минут)`;
+        }
+        else if (questionType === 'predict' && metrics) {
+            finalPrompt = `На основе исторических метрик команды ${teamName} сделай прогноз:
+Средняя скорость: ${metrics.avgFlowVelocitySP || 0} SP
+Предсказуемость: ${metrics.flowPredictability || 0}%
+
+Ответь на русском языке:
+1. Какой ожидается скорость в следующем спринте?
+2. Какие риски могут повлиять на прогноз?`;
+        }
+        else if (questionType === 'analyze_files' && filesData) {
+            finalPrompt = `Проанализируй загруженные файлы команды ${teamName}:
+
+${filesData}
+
+На основе этих данных дай:
+1. Краткую сводку о состоянии команды
+2. 3-5 конкретных рекомендаций для улучшения
+3. Какие метрики стоит отслеживать в первую очередь?`;
         }
         
         try {
             const res = await fetch('/api/groq', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt, questionType, metrics, teamName })
+                body: JSON.stringify({ prompt: finalPrompt, questionType, metrics, teamName })
             });
             const data = await res.json();
             if (data.success) {
@@ -826,7 +1015,7 @@
 
     document.getElementById('metricsTeamSelect')?.addEventListener('change', (e) => { if (e.target.value) showDetailedMetrics(e.target.value); else { document.getElementById('metricsDetails').innerHTML = ''; document.getElementById('recommendationsBlock').innerHTML = ''; destroyAllCharts(); document.getElementById('chartsContainer').innerHTML = ''; } });
     
-    // AI кнопки — обновлены для Groq
+    // AI кнопки
     document.getElementById('aiQuickMetricsBtn')?.addEventListener('click', () => {
         const teamId = document.getElementById('aiTeamSelect').value;
         if (!teamId) { alert('Выберите команду'); return; }
@@ -849,6 +1038,18 @@
         const teamId = document.getElementById('aiTeamSelect').value;
         if (!teamId) { alert('Выберите команду'); return; }
         callGroqAPI('', 'predict', teamId);
+    });
+    
+    // Новая кнопка для анализа загруженных файлов
+    document.getElementById('aiAnalyzeFilesBtn')?.addEventListener('click', () => {
+        const teamId = document.getElementById('aiTeamSelect').value;
+        if (!teamId) { alert('Выберите команду'); return; }
+        const team = teams.find(t => t.id === teamId);
+        if (!team || !team.uploadedFiles || team.uploadedFiles.length === 0) {
+            alert('Нет загруженных файлов для анализа. Сначала загрузите CSV, Excel или изображения.');
+            return;
+        }
+        callGroqAPI('', 'analyze_files', teamId);
     });
     
     document.getElementById('aiSendBtn')?.addEventListener('click', () => {
@@ -874,7 +1075,7 @@
                 <div><label>Количество участников</label><input type="number" id="modalTeamMembers" value="${team ? team.members || 1 : 1}" min="1"></div>
                 <div><label>Product Owner</label><input type="text" id="modalTeamPO" value="${escapeHtml(team ? team.productOwner || '' : '')}" placeholder="Имя PO"></div>
                 <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
-                    <button id="modalCancelBtn" style="background:#e2e8f0; color:#1e293b;">Отмена</button>
+                    <button id="modalCancelBtn" class="secondary">Отмена</button>
                     <button id="modalSaveBtn">${isEdit ? 'Сохранить' : 'Создать'}</button>
                 </div>
             </div>`;
@@ -890,8 +1091,8 @@
                 members: parseInt(document.getElementById('modalTeamMembers').value) || 1,
                 productOwner: document.getElementById('modalTeamPO').value,
                 metrics: team?.metrics || {},
-                csvFiles: team?.csvFiles || [],
-                csvData: team?.csvData || [],
+                uploadedFiles: team?.uploadedFiles || [],
+                fileData: team?.fileData || [],
                 sprintMetrics: team?.sprintMetrics || []
             };
             if (isEdit) { const idx = teams.findIndex(t => t.id === team.id); if (idx !== -1) teams[idx] = teamData; }
