@@ -3,13 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scrum Master Assistant — Flow Metrics + Groq AI</title>
+    <title>Scrum Master Assistant — Личный кабинет</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
         .container { max-width: 1400px; margin: 0 auto; }
+        
+        /* Auth forms */
+        .auth-container { max-width: 400px; margin: 50px auto; background: white; border-radius: 24px; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .auth-container h2 { margin-bottom: 24px; color: #1a1a2e; }
+        .auth-container input { width: 100%; padding: 12px; margin-bottom: 16px; border: 1px solid #ddd; border-radius: 12px; }
+        .auth-container button { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 40px; font-weight: 600; cursor: pointer; }
+        .auth-container .switch { text-align: center; margin-top: 16px; color: #667eea; cursor: pointer; }
+        .error-msg { color: #ef4444; font-size: 14px; margin-bottom: 16px; text-align: center; }
+        
+        /* Header with user info */
+        .user-bar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 24px; border-radius: 40px; margin-bottom: 20px; }
+        .user-email { font-weight: 600; color: #1a1a2e; }
+        .logout-btn { background: #ef4444; padding: 6px 16px; border-radius: 40px; color: white; border: none; cursor: pointer; font-size: 14px; }
+        
         .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 24px 32px; border-radius: 24px; margin-bottom: 32px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
         .header h1 { font-size: 28px; margin-bottom: 8px; font-weight: 700; }
         .header p { opacity: 0.8; font-size: 14px; }
@@ -68,73 +82,247 @@
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="header">
-        <h1>🧠 Scrum Master Assistant — Flow Metrics + Groq AI</h1>
-        <p>Flow Distribution · Flow Velocity · Flow Time · Flow Load · Flow Predictability · AI-аналитика от Groq (Llama 3.3)</p>
+<div class="container" id="app">
+    <!-- Форма авторизации (показывается, если не авторизован) -->
+    <div id="authContainer" class="auth-container">
+        <h2 id="authTitle">Вход в аккаунт</h2>
+        <div id="authError" class="error-msg"></div>
+        <input type="email" id="authEmail" placeholder="Email" autocomplete="email">
+        <input type="password" id="authPassword" placeholder="Пароль" autocomplete="current-password">
+        <button id="authSubmitBtn">Войти</button>
+        <div class="switch" id="authSwitch">Нет аккаунта? Зарегистрироваться</div>
     </div>
 
-    <div class="tabs">
-        <button class="tab-btn active" data-tab="teams">📋 Мои команды</button>
-        <button class="tab-btn" data-tab="metrics">📊 Flow Analytics</button>
-        <button class="tab-btn" data-tab="ai">🤖 AI-ассистент</button>
-    </div>
-
-    <div id="teams" class="panel active">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2 style="font-size: 22px; font-weight: 600;">Команды</h2>
-            <button id="addTeamBtn">+ Новая команда</button>
+    <!-- Основное приложение (показывается после авторизации) -->
+    <div id="mainApp" style="display: none;">
+        <div class="user-bar">
+            <span class="user-email" id="userEmail"></span>
+            <button class="logout-btn" id="logoutBtn">Выйти</button>
         </div>
-        <div id="teamsList"></div>
-    </div>
 
-    <div id="metrics" class="panel">
-        <div class="card">
-            <div class="card-header">📊 Детальный анализ Flow Metrics</div>
-            <select id="metricsTeamSelect" class="select-team"><option value="">-- Выберите команду --</option></select>
-            <div id="metricsDetails"></div>
-            <div class="charts-grid" id="chartsContainer"></div>
+        <div class="header">
+            <h1>🧠 Scrum Master Assistant — Flow Metrics + Groq AI</h1>
+            <p>Flow Distribution · Flow Velocity · Flow Time · Flow Load · Flow Predictability · AI-аналитика от Groq (Llama 3.3)</p>
         </div>
-        <div class="card">
-            <div class="card-header">💡 Рекомендации</div>
-            <div id="recommendationsBlock"></div>
-        </div>
-    </div>
 
-    <div id="ai" class="panel">
-        <div class="card">
-            <div class="card-header">🤖 AI-ассистент на базе Groq (Llama 3.3)</div>
-            <p style="margin-bottom: 16px; color: #475569;">ИИ анализирует ваши метрики, загруженные файлы и даёт профессиональные рекомендации.</p>
-            <div class="grid-5" style="margin-bottom: 20px;">
-                <button id="aiQuickMetricsBtn">📊 Анализ метрик</button>
-                <button id="aiQuickBottleneckBtn">🔍 Узкие горлышки</button>
-                <button id="aiQuickRetroBtn">🔄 Ретроспектива</button>
-                <button id="aiQuickPredictBtn">📈 Прогноз</button>
-                <button id="aiAnalyzeFilesBtn">📁 Анализ загруженных файлов</button>
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="teams">📋 Мои команды</button>
+            <button class="tab-btn" data-tab="metrics">📊 Flow Analytics</button>
+            <button class="tab-btn" data-tab="ai">🤖 AI-ассистент</button>
+        </div>
+
+        <div id="teams" class="panel active">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="font-size: 22px; font-weight: 600;">Команды</h2>
+                <button id="addTeamBtn">+ Новая команда</button>
             </div>
-            <select id="aiTeamSelect" class="select-team" style="margin-bottom: 16px;">
-                <option value="">-- Выберите команду --</option>
-            </select>
-            <div class="ai-prompt-container">
-                <label>💬 Задайте вопрос Groq</label>
-                <textarea id="aiPrompt" class="ai-prompt-textarea" rows="3" placeholder="Например:&#10;• Как улучшить предсказуемость команды?&#10;• Что делать при высоком Flow Time?&#10;• Проанализируй загруженные файлы и дай рекомендации..."></textarea>
+            <div id="teamsList"></div>
+        </div>
+
+        <div id="metrics" class="panel">
+            <div class="card">
+                <div class="card-header">📊 Детальный анализ Flow Metrics</div>
+                <select id="metricsTeamSelect" class="select-team"><option value="">-- Выберите команду --</option></select>
+                <div id="metricsDetails"></div>
+                <div class="charts-grid" id="chartsContainer"></div>
             </div>
-            <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                <button id="aiSendBtn">🚀 Отправить запрос</button>
-                <button id="aiClearBtn" class="secondary">Очистить</button>
+            <div class="card">
+                <div class="card-header">💡 Рекомендации</div>
+                <div id="recommendationsBlock"></div>
             </div>
-            <div id="aiResponse" class="recommendation" style="margin-top: 20px; background: #f8fafc; border-left-color: #4f46e5;">
-                💡 Здесь появится ответ AI-ассистента...
+        </div>
+
+        <div id="ai" class="panel">
+            <div class="card">
+                <div class="card-header">🤖 AI-ассистент на базе Groq (Llama 3.3)</div>
+                <p style="margin-bottom: 16px; color: #475569;">ИИ анализирует ваши метрики, загруженные файлы и даёт профессиональные рекомендации.</p>
+                <div class="grid-5" style="margin-bottom: 20px;">
+                    <button id="aiQuickMetricsBtn">📊 Анализ метрик</button>
+                    <button id="aiQuickBottleneckBtn">🔍 Узкие горлышки</button>
+                    <button id="aiQuickRetroBtn">🔄 Ретроспектива</button>
+                    <button id="aiQuickPredictBtn">📈 Прогноз</button>
+                    <button id="aiAnalyzeFilesBtn">📁 Анализ загруженных файлов</button>
+                </div>
+                <select id="aiTeamSelect" class="select-team" style="margin-bottom: 16px;">
+                    <option value="">-- Выберите команду --</option>
+                </select>
+                <div class="ai-prompt-container">
+                    <label>💬 Задайте вопрос Groq</label>
+                    <textarea id="aiPrompt" class="ai-prompt-textarea" rows="3" placeholder="Например:&#10;• Как улучшить предсказуемость команды?&#10;• Что делать при высоком Flow Time?&#10;• Проанализируй загруженные файлы и дай рекомендации..."></textarea>
+                </div>
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button id="aiSendBtn">🚀 Отправить запрос</button>
+                    <button id="aiClearBtn" class="secondary">Очистить</button>
+                </div>
+                <div id="aiResponse" class="recommendation" style="margin-top: 20px; background: #f8fafc; border-left-color: #4f46e5;">
+                    💡 Здесь появится ответ AI-ассистента...
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
+    // ========== АВТОРИЗАЦИЯ ==========
+    let currentUser = null;
     let teams = [];
     let velocityChart = null, typeChart = null, loadChart = null, flowTimeChart = null, predictabilityChart = null;
 
-    // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+    // Функции для работы с Supabase Auth
+    async function signUp(email, password) {
+        const response = await fetch('/api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'signup', email, password })
+        });
+        return response.json();
+    }
+
+    async function signIn(email, password) {
+        const response = await fetch('/api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'signin', email, password })
+        });
+        return response.json();
+    }
+
+    async function getSession() {
+        const response = await fetch('/api/auth?action=session');
+        return response.json();
+    }
+
+    async function signOut() {
+        const response = await fetch('/api/auth?action=signout', { method: 'POST' });
+        return response.json();
+    }
+
+    // Проверка авторизации при загрузке
+    async function checkAuth() {
+        const session = await getSession();
+        if (session.user) {
+            currentUser = session.user;
+            document.getElementById('authContainer').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            document.getElementById('userEmail').innerText = currentUser.email;
+            await loadTeams();
+        } else {
+            document.getElementById('authContainer').style.display = 'block';
+            document.getElementById('mainApp').style.display = 'none';
+        }
+    }
+
+    // ========== РАБОТА С КОМАНДАМИ ==========
+    async function loadTeams() {
+        if (!currentUser) return;
+        console.log('🔄 Загрузка команд для пользователя:', currentUser.id);
+        try {
+            const response = await fetch('/api/groq?action=teams');
+            const data = await response.json();
+            if (data.success && data.teams) {
+                teams = data.teams.map(t => ({
+                    id: t.id,
+                    name: t.name,
+                    description: t.description || '',
+                    members: t.members || 1,
+                    productOwner: t.product_owner || '',
+                    metrics: t.metrics || {},
+                    uploadedFiles: [],
+                    fileData: [],
+                    sprintMetrics: []
+                }));
+                for (const team of teams) {
+                    await loadTeamFiles(team);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading teams:', error);
+        }
+        renderTeams();
+        updateMetricsTeamSelect();
+        updateAITeamSelect();
+    }
+
+    async function loadTeamFiles(team) {
+        try {
+            const filesRes = await fetch(`/api/groq?action=files&teamId=${team.id}`);
+            const filesData = await filesRes.json();
+            if (filesData.success && filesData.files) {
+                team.uploadedFiles = filesData.files.map(f => ({ name: f.file_name, type: f.file_type }));
+                team.fileData = filesData.files.map(f => f.file_data);
+                if (team.sprintMetrics) team.sprintMetrics = [];
+                for (let i = 0; i < team.uploadedFiles.length; i++) {
+                    const file = team.uploadedFiles[i];
+                    if (file.type === 'csv' && team.fileData[i]) {
+                        const lines = team.fileData[i].split('\n');
+                        const headers = lines[0].split(',').map(h => h.trim());
+                        const data = [];
+                        for (let j = 1; j < lines.length; j++) {
+                            const vals = lines[j].split(',');
+                            if (vals.length >= headers.length && vals.some(v => v && v.trim())) {
+                                let row = {};
+                                headers.forEach((h, idx) => row[h] = vals[idx]?.trim() || '');
+                                data.push(row);
+                            }
+                        }
+                        const sprintMetrics = parseSingleSprint(data);
+                        if (!team.sprintMetrics) team.sprintMetrics = [];
+                        team.sprintMetrics.push(sprintMetrics);
+                    }
+                }
+                if (team.sprintMetrics && team.sprintMetrics.length > 0) {
+                    const aggregated = aggregateFlowMetrics(team.sprintMetrics);
+                    team.metrics = { ...team.metrics, ...aggregated };
+                }
+            }
+        } catch (e) { console.warn('Error loading files:', e); }
+    }
+
+    async function saveTeamToCloud(team) {
+        try {
+            const response = await fetch('/api/groq', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'save_team',
+                    team: {
+                        id: team.id,
+                        name: team.name,
+                        description: team.description,
+                        members: team.members,
+                        productOwner: team.productOwner,
+                        metrics: team.metrics
+                    }
+                })
+            });
+            const result = await response.json();
+            if (result.success && result.team) {
+                if (team.id === 'new') team.id = result.team.id;
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error saving team:', error);
+            return false;
+        }
+    }
+
+    async function saveTeams() {
+        for (const team of teams) {
+            await saveTeamToCloud(team);
+        }
+        renderTeams();
+        updateMetricsTeamSelect();
+        updateAITeamSelect();
+    }
+
+    async function deleteTeamFromCloud(teamId) {
+        try {
+            await fetch(`/api/groq?action=team&id=${teamId}`, { method: 'DELETE' });
+        } catch (error) { console.error('Error deleting team:', error); }
+    }
+
+    // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (парсинг CSV, метрики) ==========
     function parseDate(dateStr) {
         if (!dateStr) return null;
         let d = new Date(dateStr);
@@ -250,119 +438,6 @@
             flowPredictability: avgPredictability,
             sprintVelocitiesSP, sprintVelocitiesTasks, sprintPredictabilities, allFlowTimes
         };
-    }
-
-    // ========== ЗАГРУЗКА ИЗ ОБЛАКА (ОСНОВНОЙ ИСТОЧНИК) ==========
-    async function loadTeams() {
-        try {
-            const response = await fetch('/api/groq?action=teams');
-            const data = await response.json();
-            if (data.success && data.teams) {
-                teams = data.teams.map(t => ({
-                    id: t.id,
-                    name: t.name,
-                    description: t.description || '',
-                    members: t.members || 1,
-                    productOwner: t.product_owner || '',
-                    metrics: t.metrics || {},
-                    uploadedFiles: [],
-                    fileData: [],
-                    sprintMetrics: []
-                }));
-                // Загружаем файлы для каждой команды
-                for (const team of teams) {
-                    await loadTeamFiles(team);
-                    // Восстанавливаем sprintMetrics из сохранённых метрик
-                    if (team.metrics.sprintVelocitiesSP) {
-                        team.sprintMetrics = [];
-                        // Для каждого спринта нужно восстановить данные из CSV
-                        // Это делается при загрузке CSV файлов
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Error loading teams from cloud:', error);
-            const stored = localStorage.getItem('teams');
-            if (stored) teams = JSON.parse(stored);
-        }
-        renderTeams();
-        updateMetricsTeamSelect();
-        updateAITeamSelect();
-    }
-
-    async function loadTeamFiles(team) {
-        try {
-            const filesRes = await fetch(`/api/groq?action=files&teamId=${team.id}`);
-            const filesData = await filesRes.json();
-            if (filesData.success && filesData.files) {
-                team.uploadedFiles = filesData.files.map(f => ({ name: f.file_name, type: f.file_type }));
-                team.fileData = filesData.files.map(f => f.file_data);
-                
-                // Восстанавливаем sprintMetrics из CSV файлов
-                if (team.sprintMetrics) team.sprintMetrics = [];
-                for (let i = 0; i < team.uploadedFiles.length; i++) {
-                    const file = team.uploadedFiles[i];
-                    if (file.type === 'csv' && team.fileData[i]) {
-                        const lines = team.fileData[i].split('\n');
-                        const headers = lines[0].split(',').map(h => h.trim());
-                        const data = [];
-                        for (let j = 1; j < lines.length; j++) {
-                            const vals = lines[j].split(',');
-                            if (vals.length >= headers.length && vals.some(v => v && v.trim())) {
-                                let row = {};
-                                headers.forEach((h, idx) => row[h] = vals[idx]?.trim() || '');
-                                data.push(row);
-                            }
-                        }
-                        const sprintMetrics = parseSingleSprint(data);
-                        if (!team.sprintMetrics) team.sprintMetrics = [];
-                        team.sprintMetrics.push(sprintMetrics);
-                    }
-                }
-                if (team.sprintMetrics && team.sprintMetrics.length > 0) {
-                    const aggregated = aggregateFlowMetrics(team.sprintMetrics);
-                    team.metrics = { ...team.metrics, ...aggregated };
-                }
-            }
-        } catch (e) { console.warn('Error loading files for team', team.name, e); }
-    }
-
-    async function saveTeamToCloud(team) {
-        try {
-            const response = await fetch('/api/groq', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'save_team',
-                    team: {
-                        id: team.id,
-                        name: team.name,
-                        description: team.description,
-                        members: team.members,
-                        productOwner: team.productOwner,
-                        metrics: team.metrics
-                    }
-                })
-            });
-            const result = await response.json();
-            if (result.success && result.team) {
-                if (team.id === 'new') team.id = result.team.id;
-            }
-        } catch (error) { console.error('Error saving team to cloud:', error); }
-    }
-
-    async function saveTeams() {
-        for (const team of teams) {
-            await saveTeamToCloud(team);
-        }
-        renderTeams();
-        updateMetricsTeamSelect();
-        updateAITeamSelect();
-    }
-
-    async function deleteTeamFromCloud(teamId) {
-        try { await fetch(`/api/groq?action=team&id=${teamId}`, { method: 'DELETE' }); }
-        catch (error) { console.error('Error deleting team:', error); }
     }
 
     function getStatusColor(metrics) { const v = metrics.avgFlowVelocitySP || 0; const p = metrics.flowPredictability || 0; if (v > 20 && p > 75) return '#10b981'; if (v > 15 && p > 55) return '#f59e0b'; return '#ef4444'; }
@@ -624,11 +699,6 @@
             if (team?.uploadedFiles) {
                 team.uploadedFiles.splice(idx, 1);
                 if (team.fileData) team.fileData.splice(idx, 1);
-                if (team.sprintMetrics && team.uploadedFiles.filter(f => f.type === 'csv').length === 0) {
-                    team.sprintMetrics = [];
-                    const aggregated = aggregateFlowMetrics([]);
-                    team.metrics = aggregated;
-                }
                 await saveTeams();
                 document.querySelector('.modal')?.remove();
                 showFileManager(teamId);
@@ -681,7 +751,6 @@
             }
             await saveTeams();
             if (!isEdit) {
-                // Перезагружаем команды, чтобы получить правильный ID из облака
                 await loadTeams();
             }
             modal.remove();
@@ -709,7 +778,60 @@
     }));
     
     function escapeHtml(s) { return s ? s.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])) : ''; }
-    loadTeams();
+
+    // ========== АВТОРИЗАЦИЯ (обработчики) ==========
+    let isLoginMode = true;
+    const authTitle = document.getElementById('authTitle');
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    const authSwitch = document.getElementById('authSwitch');
+    const authError = document.getElementById('authError');
+
+    authSwitch.addEventListener('click', () => {
+        isLoginMode = !isLoginMode;
+        authTitle.innerText = isLoginMode ? 'Вход в аккаунт' : 'Регистрация';
+        authSubmitBtn.innerText = isLoginMode ? 'Войти' : 'Зарегистрироваться';
+        authSwitch.innerText = isLoginMode ? 'Нет аккаунта? Зарегистрироваться' : 'Уже есть аккаунт? Войти';
+        authError.innerText = '';
+    });
+
+    authSubmitBtn.addEventListener('click', async () => {
+        const email = document.getElementById('authEmail').value.trim();
+        const password = document.getElementById('authPassword').value;
+        if (!email || !password) {
+            authError.innerText = 'Заполните все поля';
+            return;
+        }
+        authError.innerText = '';
+        
+        let result;
+        if (isLoginMode) {
+            result = await signIn(email, password);
+        } else {
+            result = await signUp(email, password);
+        }
+        
+        if (result.error) {
+            authError.innerText = result.error;
+        } else if (result.user) {
+            currentUser = result.user;
+            document.getElementById('authContainer').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            document.getElementById('userEmail').innerText = currentUser.email;
+            await loadTeams();
+        }
+    });
+
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+        await signOut();
+        currentUser = null;
+        teams = [];
+        document.getElementById('authContainer').style.display = 'block';
+        document.getElementById('mainApp').style.display = 'none';
+        document.getElementById('authEmail').value = '';
+        document.getElementById('authPassword').value = '';
+    });
+
+    checkAuth();
 </script>
 </body>
 </html>
