@@ -13,31 +13,11 @@ export default async function handler(req, res) {
         process.env.SUPABASE_ANON_KEY
     );
 
-    // Получаем или создаём сессию пользователя (упрощённо — по email)
-    let userId = req.headers['x-user-id'];
-    if (!userId) {
-        // Временный пользователь — в реальном проекте используйте аутентификацию
-        const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('id')
-            .limit(1)
-            .single();
-        
-        if (error || !profile) {
-            // Создаём демо-пользователя
-            const { data: newProfile, error: createError } = await supabase
-                .from('profiles')
-                .insert({ id: '00000000-0000-0000-0000-000000000001', email: 'demo@example.com' })
-                .select()
-                .single();
-            userId = '00000000-0000-0000-0000-000000000001';
-        } else {
-            userId = profile.id;
-        }
-    }
-
-    // === CRUD операции с командами ===
+    // === Получение всех команд ===
     if (req.method === 'GET' && req.query.action === 'teams') {
+        // Для демо-режима используем фиксированный ID
+        const userId = '00000000-0000-0000-0000-000000000001';
+        
         const { data, error } = await supabase
             .from('teams')
             .select('*')
@@ -48,27 +28,51 @@ export default async function handler(req, res) {
         return res.json({ success: true, teams: data });
     }
 
+    // === Сохранение команды ===
     if (req.method === 'POST' && req.body.action === 'save_team') {
         const { team } = req.body;
-        const { data, error } = await supabase
-            .from('teams')
-            .upsert({
-                id: team.id === 'new' ? undefined : team.id,
-                user_id: userId,
-                name: team.name,
-                description: team.description,
-                members: team.members,
-                product_owner: team.productOwner,
-                metrics: team.metrics || {}
-            })
-            .select();
+        const userId = '00000000-0000-0000-0000-000000000001';
         
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json({ success: true, team: data[0] });
+        let result;
+        if (team.id && team.id !== 'new') {
+            // Обновление существующей команды
+            result = await supabase
+                .from('teams')
+                .update({
+                    name: team.name,
+                    description: team.description,
+                    members: team.members,
+                    product_owner: team.productOwner,
+                    metrics: team.metrics || {},
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', team.id)
+                .eq('user_id', userId)
+                .select();
+        } else {
+            // Создание новой команды
+            result = await supabase
+                .from('teams')
+                .insert({
+                    user_id: userId,
+                    name: team.name,
+                    description: team.description,
+                    members: team.members,
+                    product_owner: team.productOwner,
+                    metrics: team.metrics || {}
+                })
+                .select();
+        }
+        
+        if (result.error) return res.status(500).json({ error: result.error.message });
+        return res.json({ success: true, team: result.data[0] });
     }
 
+    // === Удаление команды ===
     if (req.method === 'DELETE' && req.query.action === 'team') {
         const { id } = req.query;
+        const userId = '00000000-0000-0000-0000-000000000001';
+        
         const { error } = await supabase
             .from('teams')
             .delete()
@@ -79,46 +83,7 @@ export default async function handler(req, res) {
         return res.json({ success: true });
     }
 
-    // === Сохранение файлов ===
-    if (req.method === 'POST' && req.body.action === 'save_file') {
-        const { teamId, fileName, fileType, fileData } = req.body;
-        const { data, error } = await supabase
-            .from('team_files')
-            .insert({
-                team_id: teamId,
-                file_name: fileName,
-                file_type: fileType,
-                file_data: fileData.substring(0, 5000) // ограничение для demo
-            })
-            .select();
-        
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json({ success: true, file: data[0] });
-    }
-
-    if (req.method === 'GET' && req.query.action === 'files') {
-        const { teamId } = req.query;
-        const { data, error } = await supabase
-            .from('team_files')
-            .select('*')
-            .eq('team_id', teamId);
-        
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json({ success: true, files: data });
-    }
-
-    if (req.method === 'DELETE' && req.query.action === 'file') {
-        const { id } = req.query;
-        const { error } = await supabase
-            .from('team_files')
-            .delete()
-            .eq('id', id);
-        
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json({ success: true });
-    }
-
-    // === AI анализ (как было) ===
+    // === AI анализ (основная функция) ===
     const { prompt, questionType, metrics, teamName } = req.body;
     
     const apiKey = process.env.GROQ_API_KEY;
@@ -135,6 +100,8 @@ export default async function handler(req, res) {
 WIP: ${metrics.flowLoadTotal || 0}
 
 Дай 3-5 конкретных рекомендаций.`;
+    } else if (!prompt || prompt === '') {
+        finalPrompt = 'Привет! Расскажи кратко, как ты можешь помочь Scrum-мастеру.';
     }
 
     try {
@@ -155,6 +122,7 @@ WIP: ${metrics.flowLoadTotal || 0}
         const data = await response.json();
         
         if (!response.ok) {
+            console.error('Groq API error:', data);
             return res.status(500).json({ error: data.error?.message || 'Ошибка Groq API' });
         }
 
