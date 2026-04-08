@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scrum Master Assistant — Flow Metrics</title>
+    <title>Scrum Master Assistant — AI Flow Metrics с Claude</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
@@ -23,7 +23,6 @@
             margin: 0 auto;
         }
 
-        /* Header */
         .header {
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             color: white;
@@ -44,7 +43,6 @@
             font-size: 14px;
         }
 
-        /* Tabs */
         .tabs {
             display: flex;
             gap: 12px;
@@ -77,7 +75,6 @@
             transform: translateY(-1px);
         }
 
-        /* Panels */
         .panel {
             display: none;
             animation: fadeIn 0.25s ease;
@@ -92,14 +89,12 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Cards */
         .card {
             background: white;
             border-radius: 24px;
             padding: 24px;
             margin-bottom: 24px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .card-header {
@@ -123,7 +118,6 @@
             border-radius: 20px;
             text-align: center;
             border: 1px solid #e2e8f0;
-            transition: all 0.2s;
         }
 
         .metric-value {
@@ -200,7 +194,6 @@
             background: #ef4444;
         }
 
-        /* Modal */
         .modal {
             position: fixed;
             top: 0;
@@ -329,6 +322,21 @@
             border-bottom: 1px solid #e2e8f0;
         }
 
+        .ai-loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e2e8f0;
+            border-top-color: #4f46e5;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         @media (max-width: 768px) {
             .grid-5 { grid-template-columns: 1fr; }
             .tab-btn { padding: 6px 16px; font-size: 12px; }
@@ -339,13 +347,14 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>🧠 Scrum Master Assistant — Flow Metrics</h1>
-        <p>Flow Distribution · Flow Velocity · Flow Time · Flow Load · Flow Predictability</p>
+        <h1>🧠 Scrum Master Assistant — AI Flow Metrics с Claude</h1>
+        <p>Flow Distribution · Flow Velocity · Flow Time · Flow Load · Flow Predictability · AI-аналитика от Claude 3.5 Sonnet</p>
     </div>
 
     <div class="tabs">
         <button class="tab-btn active" data-tab="teams">📋 Мои команды</button>
         <button class="tab-btn" data-tab="metrics">📊 Flow Analytics</button>
+        <button class="tab-btn" data-tab="ai">🤖 AI-ассистент (Claude)</button>
     </div>
 
     <div id="teams" class="panel active">
@@ -368,14 +377,44 @@
             <div id="recommendationsBlock"></div>
         </div>
     </div>
+
+    <!-- Вкладка AI-ассистента с Claude -->
+    <div id="ai" class="panel">
+        <div class="card">
+            <div class="card-header">🤖 AI-ассистент на базе Claude 3.5 Sonnet</div>
+            <p style="margin-bottom: 16px; color: #475569;">Claude анализирует ваши метрики и даёт профессиональные рекомендации по улучшению процессов.</p>
+            
+            <div class="grid-5" style="margin-bottom: 20px;">
+                <button id="aiQuickMetricsBtn">📊 Проанализировать метрики команды</button>
+                <button id="aiQuickBottleneckBtn">🔍 Найти узкие горлышки</button>
+                <button id="aiQuickRetroBtn">🔄 Сценарий ретроспективы</button>
+                <button id="aiQuickPredictBtn">📈 Прогноз скорости</button>
+            </div>
+            
+            <select id="aiTeamSelect" class="select-team" style="margin-bottom: 16px;">
+                <option value="">-- Выберите команду для анализа --</option>
+            </select>
+            
+            <textarea id="aiPrompt" rows="3" placeholder="Или напишите свой вопрос...&#10;&#10;Примеры:&#10;• Как улучшить предсказуемость команды?&#10;• Что делать при высоком Flow Time?&#10;• Как ограничить WIP в Kanban?" style="margin-bottom: 16px;"></textarea>
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button id="aiSendBtn">🚀 Отправить запрос Claude</button>
+                <button id="aiClearBtn" class="danger" style="background: #e2e8f0; color: #1e293b;">Очистить</button>
+            </div>
+            
+            <div id="aiResponse" class="recommendation" style="margin-top: 20px; background: #f8fafc; border-left-color: #4f46e5;">
+                💡 Здесь появится ответ AI-ассистента от Claude...
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
     let teams = [];
     let velocityChart = null, typeChart = null, loadChart = null, flowTimeChart = null, predictabilityChart = null;
 
-    function loadTeams() { const stored = localStorage.getItem('teams'); if (stored) teams = JSON.parse(stored); renderTeams(); updateMetricsTeamSelect(); }
-    function saveTeams() { localStorage.setItem('teams', JSON.stringify(teams)); renderTeams(); updateMetricsTeamSelect(); }
+    function loadTeams() { const stored = localStorage.getItem('teams'); if (stored) teams = JSON.parse(stored); renderTeams(); updateMetricsTeamSelect(); updateAITeamSelect(); }
+    function saveTeams() { localStorage.setItem('teams', JSON.stringify(teams)); renderTeams(); updateMetricsTeamSelect(); updateAITeamSelect(); }
 
     function getStatusColor(metrics) { const v = metrics.avgFlowVelocitySP || 0; const p = metrics.flowPredictability || 0; if (v > 20 && p > 75) return '#10b981'; if (v > 15 && p > 55) return '#f59e0b'; return '#ef4444'; }
     function parseDate(dateStr) { if (!dateStr) return null; let d = new Date(dateStr); if (!isNaN(d)) return d; let parts = dateStr.match(/(\d+)[\/\-\.](\d+)[\/\-\.](\d+)/); if (parts) return new Date(parts[3], parts[2]-1, parts[1]); return null; }
@@ -590,211 +629,4 @@
                         <div>
                             <div class="team-name">${escapeHtml(team.name)}</div>
                             <div class="team-desc">${escapeHtml(team.description || '')}</div>
-                            <div style="font-size:13px; margin-top:6px;">👥 ${team.members||1} участников | 📋 PO: ${escapeHtml(team.productOwner||'—')}</div>
-                        </div>
-                        <div><button onclick="editTeam('${team.id}')">✏️ Ред.</button> <button class="danger" onclick="deleteTeam('${team.id}')">🗑️</button></div>
-                    </div>
-                    <div class="grid-5" style="margin-top:20px;">
-                        <div class="metric"><div class="metric-label">📊 Flow Distribution</div><div style="font-size:13px;">${renderFlowDistribution(m.flowDistribution || {})}</div></div>
-                        <div class="metric"><div class="metric-label">⚡ Flow Velocity (средняя)</div><div class="metric-value">${m.avgFlowVelocitySP || 0} SP</div><div>${m.avgFlowVelocityTasks || 0} задач</div></div>
-                        <div class="metric"><div class="metric-label">⚡ Flow Velocity (последний спринт)</div><div class="metric-value">${m.lastSprintVelocitySP || 0} SP</div><div>${m.lastSprintVelocityTasks || 0} задач</div></div>
-                        <div class="metric"><div class="metric-label">⏱️ Flow Time</div><div class="metric-value">${m.flowTime || 0}</div><div class="metric-label">дней</div></div>
-                        <div class="metric"><div class="metric-label">📦 Flow Load</div><div style="font-size:13px;">${renderFlowLoad(m.flowLoad || {}, m.flowLoadTotal || 0)}</div></div>
-                        <div class="metric"><div class="metric-label">🎯 Flow Predictability</div><div class="metric-value">${m.flowPredictability || 0}%</div></div>
-                    </div>
-                    <div class="dropzone" onclick="showFileManager('${team.id}')">📁 Управление файлами (${team.csvFiles?.length || 0}/30)</div>
-                </div>`;
-        });
-    }
-
-    function updateMetricsTeamSelect() { const sel = document.getElementById('metricsTeamSelect'); if (!sel) return; sel.innerHTML = '<option value="">-- Выберите команду --</option>'; teams.forEach(t => sel.innerHTML += `<option value="${t.id}">${escapeHtml(t.name)}</option>`); }
-    
-    function destroyAllCharts() {
-        if (velocityChart) { velocityChart.destroy(); velocityChart = null; }
-        if (typeChart) { typeChart.destroy(); typeChart = null; }
-        if (loadChart) { loadChart.destroy(); loadChart = null; }
-        if (flowTimeChart) { flowTimeChart.destroy(); flowTimeChart = null; }
-        if (predictabilityChart) { predictabilityChart.destroy(); predictabilityChart = null; }
-    }
-
-    function renderCharts(team) {
-        const container = document.getElementById('chartsContainer');
-        if (!container) return;
-        
-        const m = team.metrics || {};
-        const sprintCount = m.sprintVelocitiesSP?.length || 0;
-        const sprintLabels = sprintCount ? Array.from({length: sprintCount}, (_, i) => `Спринт ${i+1}`) : [];
-        
-        container.innerHTML = `
-            <div class="chart-card">
-                <div class="chart-title">⚡ Flow Velocity (Скорость потока)</div>
-                <canvas id="velocityChartCanvas"></canvas>
-                <div class="metric-label" style="text-align:center; margin-top:8px;">Динамика скорости по спринтам (SP и количество задач)</div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-title">📊 Flow Distribution (Распределение потока)</div>
-                <canvas id="typeChartCanvas"></canvas>
-                <div class="metric-label" style="text-align:center; margin-top:8px;">Распределение задач по типам</div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-title">📦 Flow Load (Загрузка потока / WIP)</div>
-                <canvas id="loadChartCanvas"></canvas>
-                <div class="metric-label" style="text-align:center; margin-top:8px;">Незавершённые задачи по типам</div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-title">⏱️ Flow Time (Время потока)</div>
-                <canvas id="flowTimeChartCanvas"></canvas>
-                <div class="metric-label" style="text-align:center; margin-top:8px;">Время выполнения каждой задачи (дни)</div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-title">🎯 Flow Predictability (Прогнозируемость потока)</div>
-                <canvas id="predictabilityChartCanvas"></canvas>
-                <div class="metric-label" style="text-align:center; margin-top:8px;">Процент выполненных задач по спринтам</div>
-            </div>
-        `;
-        
-        // 1. Velocity Chart (линейный график скорости)
-        if (sprintCount > 0) {
-            const ctx = document.getElementById('velocityChartCanvas').getContext('2d');
-            velocityChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: sprintLabels,
-                    datasets: [
-                        { label: 'Скорость (SP)', data: m.sprintVelocitiesSP, borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,0.1)', fill: true, tension: 0.3, yAxisID: 'y' },
-                        { label: 'Скорость (задачи)', data: m.sprintVelocitiesTasks, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3, yAxisID: 'y1' }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { tooltip: { mode: 'index', intersect: false } }, scales: { y: { title: { display: true, text: 'Story Points' } }, y1: { position: 'right', title: { display: true, text: 'Количество задач' }, grid: { drawOnChartArea: false } } } }
-            });
-        } else {
-            document.getElementById('velocityChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет данных для отображения графика скорости</div>';
-        }
-        
-        // 2. Distribution Chart (круговая диаграмма)
-        if (m.flowDistribution && Object.keys(m.flowDistribution).length > 0) {
-            const ctx = document.getElementById('typeChartCanvas').getContext('2d');
-            typeChart = new Chart(ctx, {
-                type: 'pie',
-                data: { labels: Object.keys(m.flowDistribution), datasets: [{ data: Object.values(m.flowDistribution).map(v=>v.count), backgroundColor: ['#4f46e5','#7c3aed','#f59e0b','#10b981','#ef4444','#8b5cf6'] }] },
-                options: { responsive: true, plugins: { legend: { position: 'right' } } }
-            });
-        } else {
-            document.getElementById('typeChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет данных для отображения распределения</div>';
-        }
-        
-        // 3. Load Chart (столбчатая диаграмма WIP)
-        if (m.flowLoad && Object.keys(m.flowLoad).length > 0) {
-            const ctx = document.getElementById('loadChartCanvas').getContext('2d');
-            loadChart = new Chart(ctx, {
-                type: 'bar',
-                data: { labels: Object.keys(m.flowLoad), datasets: [{ label: 'Незавершённые задачи (WIP)', data: Object.values(m.flowLoad), backgroundColor: '#f59e0b', borderRadius: 8 }] },
-                options: { responsive: true, plugins: { legend: { position: 'top' } } }
-            });
-        } else {
-            document.getElementById('loadChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет незавершённых задач</div>';
-        }
-        
-        // 4. Flow Time Chart (точечная диаграмма scatter plot)
-        if (m.allFlowTimes && m.allFlowTimes.length > 0) {
-            const scatterData = m.allFlowTimes.map((value, index) => ({ x: index + 1, y: value }));
-            const ctx = document.getElementById('flowTimeChartCanvas').getContext('2d');
-            flowTimeChart = new Chart(ctx, {
-                type: 'scatter',
-                data: { datasets: [{ label: 'Время выполнения задачи (дни)', data: scatterData, backgroundColor: '#4f46e5', pointRadius: 6, pointHoverRadius: 8 }] },
-                options: { responsive: true, scales: { y: { title: { display: true, text: 'Flow Time (дни)' }, beginAtZero: true }, x: { title: { display: true, text: 'Задача №' } } }, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.raw.y} дней` } } } }
-            });
-        } else {
-            document.getElementById('flowTimeChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет данных о времени выполнения задач</div>';
-        }
-        
-        // 5. Predictability Chart (линейный график)
-        if (sprintCount > 0) {
-            const ctx = document.getElementById('predictabilityChartCanvas').getContext('2d');
-            predictabilityChart = new Chart(ctx, {
-                type: 'line',
-                data: { labels: sprintLabels, datasets: [{ label: 'Прогнозируемость (%)', data: m.sprintPredictabilities, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.3 }] },
-                options: { responsive: true, scales: { y: { title: { display: true, text: 'Процент (%)' }, min: 0, max: 100 } }, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.raw}%` } } } }
-            });
-        } else {
-            document.getElementById('predictabilityChartCanvas').parentElement.innerHTML += '<div class="metric-label">Нет данных для отображения прогнозируемости</div>';
-        }
-    }
-
-    function showDetailedMetrics(teamId) {
-        const team = teams.find(t => t.id === teamId); if (!team) return;
-        const m = team.metrics || {};
-        const container = document.getElementById('metricsDetails'); if (!container) return;
-        destroyAllCharts();
-        
-        container.innerHTML = `
-            <h3 style="margin-bottom: 16px;">${escapeHtml(team.name)} — детальные Flow Metrics</h3>
-            <div class="grid-5">
-                <div class="metric"><div class="metric-label">Flow Distribution</div><div>${renderFlowDistribution(m.flowDistribution || {})}</div></div>
-                <div class="metric"><div class="metric-label">Flow Velocity (средняя)</div><div class="metric-value">${m.avgFlowVelocitySP || 0} SP</div><div>${m.avgFlowVelocityTasks || 0} задач</div></div>
-                <div class="metric"><div class="metric-label">Flow Velocity (последний)</div><div class="metric-value">${m.lastSprintVelocitySP || 0} SP</div><div>${m.lastSprintVelocityTasks || 0} задач</div></div>
-                <div class="metric"><div class="metric-label">Flow Time</div><div class="metric-value">${m.flowTime || 0} дней</div></div>
-                <div class="metric"><div class="metric-label">Flow Load</div><div>${renderFlowLoad(m.flowLoad || {}, m.flowLoadTotal || 0)}</div></div>
-                <div class="metric"><div class="metric-label">Flow Predictability</div><div class="metric-value">${m.flowPredictability || 0}%</div></div>
-            </div>`;
-        
-        renderCharts(team);
-        
-        let recHtml = `<div class="recommendation"><strong>💡 Рекомендации на основе Flow Metrics</strong><br><br>`;
-        if (m.avgFlowVelocitySP < 20) recHtml += `⚠️ <strong>Низкая скорость</strong> (менее 20 SP). Проверьте наличие блокеров и ограничьте WIP.<br><br>`;
-        if (m.flowPredictability < 60) recHtml += `📉 <strong>Низкая предсказуемость</strong> (менее 60%). Улучшите планирование спринта.<br><br>`;
-        if (m.flowTime > 10) recHtml += `⏱️ <strong>Высокое время выполнения</strong> (более 10 дней). Дробьте задачи на более мелкие.<br><br>`;
-        let loadSum = m.flowLoadTotal || 0;
-        if (loadSum > 20) recHtml += `📦 <strong>Высокий Flow Load (WIP)</strong> (${loadSum} задач). Ограничьте количество задач в работе.<br><br>`;
-        if (recHtml === `<div class="recommendation"><strong>💡 Рекомендации на основе Flow Metrics</strong><br><br>`) recHtml += `✅ Все метрики в норме. Команда демонстрирует хороший поток доставки.<br><br>`;
-        recHtml += `</div>`;
-        document.getElementById('recommendationsBlock').innerHTML = recHtml;
-    }
-
-    document.getElementById('metricsTeamSelect')?.addEventListener('change', (e) => { if (e.target.value) showDetailedMetrics(e.target.value); else { document.getElementById('metricsDetails').innerHTML = ''; document.getElementById('recommendationsBlock').innerHTML = ''; destroyAllCharts(); document.getElementById('chartsContainer').innerHTML = ''; } });
-    
-    function showTeamModal(team = null) {
-        const isEdit = !!team;
-        const modal = document.createElement('div'); modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <h3>${isEdit ? '✏️ Редактировать команду' : '➕ Новая команда'}</h3>
-                <div><label>Название команды *</label><input type="text" id="modalTeamName" value="${escapeHtml(team ? team.name : '')}" placeholder="Например: Team Alpha"></div>
-                <div><label>Краткое описание</label><textarea id="modalTeamDesc" rows="2" placeholder="Чем занимается команда...">${escapeHtml(team ? team.description || '' : '')}</textarea></div>
-                <div><label>Количество участников</label><input type="number" id="modalTeamMembers" value="${team ? team.members || 1 : 1}" min="1"></div>
-                <div><label>Product Owner</label><input type="text" id="modalTeamPO" value="${escapeHtml(team ? team.productOwner || '' : '')}" placeholder="Имя PO"></div>
-                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
-                    <button id="modalCancelBtn" style="background:#e2e8f0; color:#1e293b;">Отмена</button>
-                    <button id="modalSaveBtn">${isEdit ? 'Сохранить' : 'Создать'}</button>
-                </div>
-            </div>`;
-        document.body.appendChild(modal);
-        document.getElementById('modalCancelBtn').onclick = () => modal.remove();
-        document.getElementById('modalSaveBtn').onclick = () => {
-            const name = document.getElementById('modalTeamName').value.trim();
-            if (!name) { alert('Введите название команды'); return; }
-            const teamData = {
-                id: isEdit ? team.id : Date.now().toString(),
-                name,
-                description: document.getElementById('modalTeamDesc').value,
-                members: parseInt(document.getElementById('modalTeamMembers').value) || 1,
-                productOwner: document.getElementById('modalTeamPO').value,
-                metrics: team?.metrics || {},
-                csvFiles: team?.csvFiles || [],
-                csvData: team?.csvData || [],
-                sprintMetrics: team?.sprintMetrics || []
-            };
-            if (isEdit) { const idx = teams.findIndex(t => t.id === team.id); if (idx !== -1) teams[idx] = teamData; }
-            else teams.push(teamData);
-            saveTeams(); modal.remove();
-        };
-    }
-    window.editTeam = (id) => { const team = teams.find(t => t.id === id); if (team) showTeamModal(team); };
-    window.deleteTeam = (id) => { if (confirm('Удалить команду?')) { teams = teams.filter(t => t.id !== id); saveTeams(); } };
-    document.getElementById('addTeamBtn')?.addEventListener('click', () => showTeamModal());
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => { document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active')); btn.classList.add('active'); document.getElementById(btn.dataset.tab).classList.add('active'); }));
-    function escapeHtml(s) { return s ? s.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])) : ''; }
-    loadTeams();
-</script>
-</body>
-</html>
+                            <div style="font-size:13
