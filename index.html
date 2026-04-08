@@ -10,15 +10,24 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
         .container { max-width: 1400px; margin: 0 auto; }
-        .auth-container { max-width: 400px; margin: 50px auto; background: white; border-radius: 24px; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        .auth-container h2 { margin-bottom: 24px; color: #1a1a2e; }
-        .auth-container input { width: 100%; padding: 12px; margin-bottom: 16px; border: 1px solid #ddd; border-radius: 12px; }
-        .auth-container button { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 40px; font-weight: 600; cursor: pointer; }
-        .auth-container .switch { text-align: center; margin-top: 16px; color: #667eea; cursor: pointer; }
+        
+        /* Auth forms */
+        .auth-container { max-width: 420px; margin: 50px auto; background: white; border-radius: 28px; padding: 36px; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.1); }
+        .auth-container h2 { margin-bottom: 24px; color: #1a1a2e; font-size: 26px; text-align: center; }
+        .auth-container input { width: 100%; padding: 14px 16px; margin-bottom: 16px; border: 1px solid #e2e8f0; border-radius: 16px; font-size: 15px; transition: all 0.2s; }
+        .auth-container input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .auth-container button { width: 100%; padding: 14px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 40px; font-weight: 600; font-size: 16px; cursor: pointer; transition: transform 0.2s; margin-top: 8px; }
+        .auth-container button:hover { transform: translateY(-2px); }
+        .auth-container .switch { text-align: center; margin-top: 20px; color: #667eea; cursor: pointer; font-size: 14px; }
+        .auth-container .guest-btn { background: linear-gradient(135deg, #64748b 0%, #475569 100%); margin-top: 12px; }
         .error-msg { color: #ef4444; font-size: 14px; margin-bottom: 16px; text-align: center; }
-        .user-bar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 24px; border-radius: 40px; margin-bottom: 20px; }
+        
+        .user-bar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 24px; border-radius: 60px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .user-email { font-weight: 600; color: #1a1a2e; }
-        .logout-btn { background: #ef4444; padding: 6px 16px; border-radius: 40px; color: white; border: none; cursor: pointer; font-size: 14px; }
+        .guest-badge { background: #e2e8f0; padding: 4px 12px; border-radius: 40px; font-size: 12px; font-weight: 600; color: #475569; margin-left: 12px; }
+        .logout-btn { background: #ef4444; padding: 6px 20px; border-radius: 40px; color: white; border: none; cursor: pointer; font-size: 14px; font-weight: 500; }
+        .logout-btn:hover { background: #dc2626; }
+        
         .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 24px 32px; border-radius: 24px; margin-bottom: 32px; }
         .header h1 { font-size: 28px; margin-bottom: 8px; font-weight: 700; }
         .header p { opacity: 0.8; font-size: 14px; }
@@ -85,11 +94,15 @@
         <input type="password" id="authPassword" placeholder="Пароль" autocomplete="current-password">
         <button id="authSubmitBtn">Войти</button>
         <div class="switch" id="authSwitch">Нет аккаунта? Зарегистрироваться</div>
+        <button id="guestBtn" class="guest-btn">👥 Продолжить без регистрации (гость)</button>
     </div>
 
     <div id="mainApp" style="display: none;">
         <div class="user-bar">
-            <span class="user-email" id="userEmail"></span>
+            <div>
+                <span class="user-email" id="userEmail"></span>
+                <span id="guestBadge" class="guest-badge" style="display: none;">Гость</span>
+            </div>
             <button class="logout-btn" id="logoutBtn">Выйти</button>
         </div>
         <div class="header">
@@ -152,6 +165,7 @@
 
 <script>
     let currentUser = null;
+    let isGuest = false;
     let teams = [];
     let velocityChart = null, typeChart = null, loadChart = null, flowTimeChart = null, predictabilityChart = null;
 
@@ -178,6 +192,7 @@
         const data = await response.json();
         if (data.session?.access_token) {
             localStorage.setItem('sb_access_token', data.session.access_token);
+            localStorage.setItem('is_guest', 'false');
         }
         return data;
     }
@@ -195,6 +210,7 @@
 
     async function signOut() {
         localStorage.removeItem('sb_access_token');
+        localStorage.removeItem('is_guest');
         const response = await fetch('/api/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -203,13 +219,38 @@
         return response.json();
     }
 
+    function guestLogin() {
+        isGuest = true;
+        currentUser = { id: 'guest', email: 'Гостевой режим' };
+        localStorage.setItem('is_guest', 'true');
+        document.getElementById('authContainer').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        document.getElementById('userEmail').innerText = 'Гостевой режим';
+        document.getElementById('guestBadge').style.display = 'inline-block';
+        loadTeamsFromLocal();
+    }
+
     async function checkAuth() {
+        const isGuestStored = localStorage.getItem('is_guest') === 'true';
+        if (isGuestStored) {
+            isGuest = true;
+            currentUser = { id: 'guest', email: 'Гостевой режим' };
+            document.getElementById('authContainer').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            document.getElementById('userEmail').innerText = 'Гостевой режим';
+            document.getElementById('guestBadge').style.display = 'inline-block';
+            loadTeamsFromLocal();
+            return;
+        }
+        
         const session = await getSession();
         if (session.user) {
             currentUser = session.user;
+            isGuest = false;
             document.getElementById('authContainer').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
             document.getElementById('userEmail').innerText = currentUser.email;
+            document.getElementById('guestBadge').style.display = 'none';
             await loadTeams();
         } else {
             document.getElementById('authContainer').style.display = 'block';
@@ -217,21 +258,46 @@
         }
     }
 
-    // ========== ФУНКЦИИ ДЛЯ РАБОТЫ С КОМАНДАМИ (с токеном) ==========
+    // ========== ФУНКЦИИ ДЛЯ РАБОТЫ С КОМАНДАМИ ==========
     async function fetchWithAuth(url, options = {}) {
         const token = localStorage.getItem('sb_access_token');
         const headers = {
             'Content-Type': 'application/json',
             ...options.headers
         };
-        if (token) {
+        if (token && !isGuest) {
             headers['Authorization'] = `Bearer ${token}`;
         }
         const response = await fetch(url, { ...options, headers });
         return response;
     }
 
+    function loadTeamsFromLocal() {
+        const stored = localStorage.getItem('guest_teams');
+        if (stored) {
+            teams = JSON.parse(stored);
+        } else {
+            teams = [];
+        }
+        renderTeams();
+        updateMetricsTeamSelect();
+        updateAITeamSelect();
+    }
+
+    function saveTeamsToLocal() {
+        if (isGuest) {
+            localStorage.setItem('guest_teams', JSON.stringify(teams));
+        }
+        renderTeams();
+        updateMetricsTeamSelect();
+        updateAITeamSelect();
+    }
+
     async function loadTeams() {
+        if (isGuest) {
+            loadTeamsFromLocal();
+            return;
+        }
         if (!currentUser) return;
         try {
             const response = await fetchWithAuth('/api/groq?action=teams');
@@ -261,6 +327,7 @@
     }
 
     async function loadTeamFiles(team) {
+        if (isGuest) return;
         try {
             const filesRes = await fetchWithAuth(`/api/groq?action=files&teamId=${team.id}`);
             const filesData = await filesRes.json();
@@ -296,6 +363,17 @@
     }
 
     async function saveTeamToCloud(team) {
+        if (isGuest) {
+            const index = teams.findIndex(t => t.id === team.id);
+            if (index !== -1) {
+                teams[index] = team;
+            } else {
+                teams.push(team);
+            }
+            saveTeamsToLocal();
+            return true;
+        }
+        
         try {
             const response = await fetchWithAuth('/api/groq', {
                 method: 'POST',
@@ -324,6 +402,10 @@
     }
 
     async function saveTeams() {
+        if (isGuest) {
+            saveTeamsToLocal();
+            return;
+        }
         for (const team of teams) {
             await saveTeamToCloud(team);
         }
@@ -333,6 +415,11 @@
     }
 
     async function deleteTeamFromCloud(teamId) {
+        if (isGuest) {
+            teams = teams.filter(t => t.id !== teamId);
+            saveTeamsToLocal();
+            return;
+        }
         try {
             await fetchWithAuth(`/api/groq?action=team&id=${teamId}`, { method: 'DELETE' });
         } catch (error) { console.error('Error deleting team:', error); }
@@ -356,18 +443,20 @@
             fileData = await imageToBase64(file);
         }
         
-        try {
-            await fetchWithAuth('/api/groq', {
-                method: 'POST',
-                body: JSON.stringify({
-                    action: 'save_file',
-                    teamId: teamId,
-                    fileName: file.name,
-                    fileType: fileType,
-                    fileData: fileData?.substring(0, 5000) || ''
-                })
-            });
-        } catch (error) { console.error('Error saving file:', error); }
+        if (!isGuest) {
+            try {
+                await fetchWithAuth('/api/groq', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'save_file',
+                        teamId: teamId,
+                        fileName: file.name,
+                        fileType: fileType,
+                        fileData: fileData?.substring(0, 5000) || ''
+                    })
+                });
+            } catch (error) { console.error('Error saving file:', error); }
+        }
         
         if (!team.uploadedFiles) team.uploadedFiles = [];
         team.uploadedFiles.push({ name: file.name, type: fileType });
@@ -751,7 +840,7 @@
             const name = document.getElementById('modalTeamName').value.trim();
             if (!name) { alert('Введите название'); return; }
             const teamData = {
-                id: isEdit ? team.id : 'new',
+                id: isEdit ? team.id : Date.now().toString(),
                 name,
                 description: document.getElementById('modalTeamDesc').value,
                 members: parseInt(document.getElementById('modalTeamMembers').value) || 1,
@@ -768,9 +857,6 @@
                 teams.push(teamData);
             }
             await saveTeams();
-            if (!isEdit) {
-                await loadTeams();
-            }
             modal.remove();
         };
     }
@@ -803,6 +889,7 @@
     const authSubmitBtn = document.getElementById('authSubmitBtn');
     const authSwitch = document.getElementById('authSwitch');
     const authError = document.getElementById('authError');
+    const guestBtn = document.getElementById('guestBtn');
 
     authSwitch.addEventListener('click', () => {
         isLoginMode = !isLoginMode;
@@ -832,16 +919,23 @@
             authError.innerText = result.error;
         } else if (result.user) {
             currentUser = result.user;
+            isGuest = false;
             document.getElementById('authContainer').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
             document.getElementById('userEmail').innerText = currentUser.email;
+            document.getElementById('guestBadge').style.display = 'none';
             await loadTeams();
         }
+    });
+
+    guestBtn.addEventListener('click', () => {
+        guestLogin();
     });
 
     document.getElementById('logoutBtn')?.addEventListener('click', async () => {
         await signOut();
         currentUser = null;
+        isGuest = false;
         teams = [];
         document.getElementById('authContainer').style.display = 'block';
         document.getElementById('mainApp').style.display = 'none';
