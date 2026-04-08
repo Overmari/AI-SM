@@ -30,15 +30,62 @@ export default async function handler(req, res) {
         const { action, email, password } = req.body;
         
         if (action === 'signup') {
-            const { data, error } = await supabase.auth.signUp({ email, password });
-            if (error) return res.status(400).json({ error: error.message });
+            const { data, error } = await supabase.auth.signUp({ 
+                email, 
+                password,
+                options: {
+                    data: { email: email }
+                }
+            });
+            
+            if (error) {
+                console.error('Signup error:', error);
+                return res.status(400).json({ error: error.message });
+            }
+            
+            // Автоматически создаём профиль
+            if (data.user) {
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .insert([{ id: data.user.id, email: email }]);
+                
+                if (profileError) {
+                    console.error('Profile creation error:', profileError);
+                    // Не возвращаем ошибку, профиль создастся при первом входе
+                }
+            }
+            
             return res.json({ user: data.user });
         }
         
         if (action === 'signin') {
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) return res.status(400).json({ error: error.message });
-            return res.json({ user: data.user, session: data.session });
+            if (error) {
+                console.error('Signin error:', error);
+                return res.status(400).json({ error: error.message });
+            }
+            
+            // Проверяем наличие профиля, создаём если нет
+            if (data.user) {
+                const { data: existingProfile } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('id', data.user.id)
+                    .single();
+                
+                if (!existingProfile) {
+                    await supabase
+                        .from('profiles')
+                        .insert([{ id: data.user.id, email: email }]);
+                }
+            }
+            
+            // Возвращаем сессию с токеном
+            return res.json({ 
+                user: data.user, 
+                session: data.session,
+                accessToken: data.session?.access_token 
+            });
         }
         
         if (action === 'signout') {
