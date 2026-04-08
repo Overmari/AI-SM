@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scrum Master Assistant — Flow Metrics + Claude AI</title>
+    <title>Scrum Master Assistant — Flow Metrics + OpenRouter AI</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
@@ -347,8 +347,8 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>🧠 Scrum Master Assistant — Flow Metrics + Claude AI</h1>
-        <p>Flow Distribution · Flow Velocity · Flow Time · Flow Load · Flow Predictability · AI-аналитика от Claude</p>
+        <h1>🧠 Scrum Master Assistant — Flow Metrics + OpenRouter AI</h1>
+        <p>Flow Distribution · Flow Velocity · Flow Time · Flow Load · Flow Predictability · AI-аналитика через OpenRouter</p>
     </div>
 
     <div class="tabs">
@@ -380,8 +380,8 @@
 
     <div id="ai" class="panel">
         <div class="card">
-            <div class="card-header">🤖 AI-ассистент на базе Claude</div>
-            <p style="margin-bottom: 16px; color: #475569;">Claude анализирует ваши метрики и даёт профессиональные рекомендации.</p>
+            <div class="card-header">🤖 AI-ассистент на базе OpenRouter</div>
+            <p style="margin-bottom: 16px; color: #475569;">OpenRouter анализирует ваши метрики через бесплатные модели (Gemini, Llama, Qwen).</p>
             
             <div class="grid-5" style="margin-bottom: 20px;">
                 <button id="aiQuickMetricsBtn">📊 Анализ метрик</button>
@@ -397,12 +397,12 @@
             <textarea id="aiPrompt" rows="3" placeholder="Или напишите свой вопрос..." style="margin-bottom: 16px;"></textarea>
             
             <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                <button id="aiSendBtn">🚀 Отправить Claude</button>
+                <button id="aiSendBtn">🚀 Отправить запрос</button>
                 <button id="aiClearBtn" style="background: #e2e8f0; color: #1e293b;">Очистить</button>
             </div>
             
             <div id="aiResponse" class="recommendation" style="margin-top: 20px; background: #f8fafc; border-left-color: #4f46e5;">
-                💡 Здесь появится ответ Claude...
+                💡 Здесь появится ответ AI-ассистента...
             </div>
         </div>
     </div>
@@ -792,29 +792,32 @@
         document.getElementById('recommendationsBlock').innerHTML = recHtml;
     }
 
-    async function callClaudeAPI(prompt, questionType, teamId) {
+    // Функция для вызова OpenRouter API
+    async function callOpenRouterAPI(prompt, questionType, teamId) {
         const responseDiv = document.getElementById('aiResponse');
-        responseDiv.innerHTML = '<div class="ai-loading"></div> Claude анализирует...';
+        responseDiv.innerHTML = '<div class="ai-loading"></div> OpenRouter анализирует...';
         
         let metrics = null;
+        let teamName = '';
         if (teamId) {
             const team = teams.find(t => t.id === teamId);
-            if (team && team.metrics) {
+            if (team) {
+                teamName = team.name;
                 metrics = team.metrics;
             }
         }
         
         try {
-            const res = await fetch('/api/claude', {
+            const res = await fetch('/api/openrouter', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt, questionType, metrics, context: teamId ? `Команда: ${teams.find(t => t.id === teamId)?.name}` : '' })
+                body: JSON.stringify({ prompt, questionType, metrics, teamName, context: teamName ? `Команда: ${teamName}` : '' })
             });
             const data = await res.json();
             if (data.success) {
                 responseDiv.innerHTML = data.analysis.replace(/\n/g, '<br>');
             } else {
-                responseDiv.innerHTML = `❌ Ошибка: ${data.error || 'Неизвестная ошибка'}<br><br>Проверьте, что добавлен API-ключ ANTHROPIC_API_KEY в настройках Vercel.`;
+                responseDiv.innerHTML = `❌ Ошибка: ${data.error || 'Неизвестная ошибка'}<br><br>Проверьте, что добавлен API-ключ OPENROUTER_API_KEY в настройках Vercel.`;
             }
         } catch (error) {
             responseDiv.innerHTML = `❌ Ошибка соединения: ${error.message}`;
@@ -827,37 +830,37 @@
     document.getElementById('aiQuickMetricsBtn')?.addEventListener('click', () => {
         const teamId = document.getElementById('aiTeamSelect').value;
         if (!teamId) { alert('Выберите команду'); return; }
-        callClaudeAPI('', 'analyze', teamId);
+        callOpenRouterAPI('', 'analyze', teamId);
     });
     
     document.getElementById('aiQuickBottleneckBtn')?.addEventListener('click', () => {
         const teamId = document.getElementById('aiTeamSelect').value;
         if (!teamId) { alert('Выберите команду'); return; }
-        callClaudeAPI('', 'bottleneck', teamId);
+        callOpenRouterAPI('', 'bottleneck', teamId);
     });
     
     document.getElementById('aiQuickRetroBtn')?.addEventListener('click', () => {
         const teamId = document.getElementById('aiTeamSelect').value;
         if (!teamId) { alert('Выберите команду'); return; }
-        callClaudeAPI('', 'retro', teamId);
+        callOpenRouterAPI('', 'retro', teamId);
     });
     
     document.getElementById('aiQuickPredictBtn')?.addEventListener('click', () => {
         const teamId = document.getElementById('aiTeamSelect').value;
         if (!teamId) { alert('Выберите команду'); return; }
-        callClaudeAPI('', 'predict', teamId);
+        callOpenRouterAPI('', 'predict', teamId);
     });
     
     document.getElementById('aiSendBtn')?.addEventListener('click', () => {
         const prompt = document.getElementById('aiPrompt').value.trim();
         if (!prompt) { alert('Введите вопрос'); return; }
         const teamId = document.getElementById('aiTeamSelect').value;
-        callClaudeAPI(prompt, 'custom', teamId);
+        callOpenRouterAPI(prompt, 'custom', teamId);
     });
     
     document.getElementById('aiClearBtn')?.addEventListener('click', () => {
         document.getElementById('aiPrompt').value = '';
-        document.getElementById('aiResponse').innerHTML = '💡 Здесь появится ответ Claude...';
+        document.getElementById('aiResponse').innerHTML = '💡 Здесь появится ответ AI-ассистента...';
     });
     
     function showTeamModal(team = null) {
