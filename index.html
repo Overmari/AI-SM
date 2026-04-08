@@ -252,7 +252,7 @@
         };
     }
 
-    // ========== ЗАГРУЗКА ИЗ ОБЛАКА ==========
+    // ========== ЗАГРУЗКА ИЗ ОБЛАКА (ОСНОВНОЙ ИСТОЧНИК) ==========
     async function loadTeams() {
         try {
             const response = await fetch('/api/groq?action=teams');
@@ -269,25 +269,62 @@
                     fileData: [],
                     sprintMetrics: []
                 }));
+                // Загружаем файлы для каждой команды
                 for (const team of teams) {
-                    try {
-                        const filesRes = await fetch(`/api/groq?action=files&teamId=${team.id}`);
-                        const filesData = await filesRes.json();
-                        if (filesData.success && filesData.files) {
-                            team.uploadedFiles = filesData.files.map(f => ({ name: f.file_name, type: f.file_type }));
-                            team.fileData = filesData.files.map(f => f.file_data);
-                        }
-                    } catch (e) { console.warn(e); }
+                    await loadTeamFiles(team);
+                    // Восстанавливаем sprintMetrics из сохранённых метрик
+                    if (team.metrics.sprintVelocitiesSP) {
+                        team.sprintMetrics = [];
+                        // Для каждого спринта нужно восстановить данные из CSV
+                        // Это делается при загрузке CSV файлов
+                    }
                 }
             }
         } catch (error) {
-            console.error('Error loading teams:', error);
+            console.error('Error loading teams from cloud:', error);
             const stored = localStorage.getItem('teams');
             if (stored) teams = JSON.parse(stored);
         }
         renderTeams();
         updateMetricsTeamSelect();
         updateAITeamSelect();
+    }
+
+    async function loadTeamFiles(team) {
+        try {
+            const filesRes = await fetch(`/api/groq?action=files&teamId=${team.id}`);
+            const filesData = await filesRes.json();
+            if (filesData.success && filesData.files) {
+                team.uploadedFiles = filesData.files.map(f => ({ name: f.file_name, type: f.file_type }));
+                team.fileData = filesData.files.map(f => f.file_data);
+                
+                // Восстанавливаем sprintMetrics из CSV файлов
+                if (team.sprintMetrics) team.sprintMetrics = [];
+                for (let i = 0; i < team.uploadedFiles.length; i++) {
+                    const file = team.uploadedFiles[i];
+                    if (file.type === 'csv' && team.fileData[i]) {
+                        const lines = team.fileData[i].split('\n');
+                        const headers = lines[0].split(',').map(h => h.trim());
+                        const data = [];
+                        for (let j = 1; j < lines.length; j++) {
+                            const vals = lines[j].split(',');
+                            if (vals.length >= headers.length && vals.some(v => v && v.trim())) {
+                                let row = {};
+                                headers.forEach((h, idx) => row[h] = vals[idx]?.trim() || '');
+                                data.push(row);
+                            }
+                        }
+                        const sprintMetrics = parseSingleSprint(data);
+                        if (!team.sprintMetrics) team.sprintMetrics = [];
+                        team.sprintMetrics.push(sprintMetrics);
+                    }
+                }
+                if (team.sprintMetrics && team.sprintMetrics.length > 0) {
+                    const aggregated = aggregateFlowMetrics(team.sprintMetrics);
+                    team.metrics = { ...team.metrics, ...aggregated };
+                }
+            }
+        } catch (e) { console.warn('Error loading files for team', team.name, e); }
     }
 
     async function saveTeamToCloud(team) {
@@ -308,12 +345,16 @@
                 })
             });
             const result = await response.json();
-            if (result.success && result.team) team.id = result.team.id;
-        } catch (error) { console.error('Error saving team:', error); }
+            if (result.success && result.team) {
+                if (team.id === 'new') team.id = result.team.id;
+            }
+        } catch (error) { console.error('Error saving team to cloud:', error); }
     }
 
     async function saveTeams() {
-        for (const team of teams) await saveTeamToCloud(team);
+        for (const team of teams) {
+            await saveTeamToCloud(team);
+        }
         renderTeams();
         updateMetricsTeamSelect();
         updateAITeamSelect();
@@ -369,6 +410,8 @@
         
         if (!team.uploadedFiles) team.uploadedFiles = [];
         team.uploadedFiles.push({ name: file.name, type: fileType });
+        if (!team.fileData) team.fileData = [];
+        team.fileData.push(fileData);
         
         if (fileType === 'csv') {
             const lines = fileData.split('\n');
@@ -388,7 +431,8 @@
             const aggregated = aggregateFlowMetrics(team.sprintMetrics);
             team.metrics = aggregated;
         }
-        saveTeams();
+        await saveTeams();
+        renderTeams();
     }
 
     function renderFlowDistribution(dist) {
@@ -580,6 +624,11 @@
             if (team?.uploadedFiles) {
                 team.uploadedFiles.splice(idx, 1);
                 if (team.fileData) team.fileData.splice(idx, 1);
+                if (team.sprintMetrics && team.uploadedFiles.filter(f => f.type === 'csv').length === 0) {
+                    team.sprintMetrics = [];
+                    const aggregated = aggregateFlowMetrics([]);
+                    team.metrics = aggregated;
+                }
                 await saveTeams();
                 document.querySelector('.modal')?.remove();
                 showFileManager(teamId);
@@ -610,11 +659,11 @@
             </div></div>`;
         document.body.appendChild(modal);
         document.getElementById('modalCancelBtn').onclick = () => modal.remove();
-        document.getElementById('modalSaveBtn').onclick = () => {
+        document.getElementById('modalSaveBtn').onclick = async () => {
             const name = document.getElementById('modalTeamName').value.trim();
             if (!name) { alert('Введите название'); return; }
             const teamData = {
-                id: isEdit ? team.id : Date.now().toString(),
+                id: isEdit ? team.id : 'new',
                 name,
                 description: document.getElementById('modalTeamDesc').value,
                 members: parseInt(document.getElementById('modalTeamMembers').value) || 1,
@@ -624,14 +673,32 @@
                 fileData: team?.fileData || [],
                 sprintMetrics: team?.sprintMetrics || []
             };
-            if (isEdit) { const idx = teams.findIndex(t => t.id === team.id); if (idx !== -1) teams[idx] = teamData; }
-            else teams.push(teamData);
-            saveTeams(); modal.remove();
+            if (isEdit) {
+                const idx = teams.findIndex(t => t.id === team.id);
+                if (idx !== -1) teams[idx] = teamData;
+            } else {
+                teams.push(teamData);
+            }
+            await saveTeams();
+            if (!isEdit) {
+                // Перезагружаем команды, чтобы получить правильный ID из облака
+                await loadTeams();
+            }
+            modal.remove();
         };
     }
     
     window.editTeam = (id) => { const team = teams.find(t => t.id === id); if (team) showTeamModal(team); };
-    window.deleteTeam = async (id) => { if (confirm('Удалить команду?')) { await deleteTeamFromCloud(id); teams = teams.filter(t => t.id !== id); saveTeams(); } };
+    window.deleteTeam = async (id) => {
+        if (confirm('Удалить команду?')) {
+            await deleteTeamFromCloud(id);
+            teams = teams.filter(t => t.id !== id);
+            await saveTeams();
+            renderTeams();
+            updateMetricsTeamSelect();
+            updateAITeamSelect();
+        }
+    };
     document.getElementById('addTeamBtn')?.addEventListener('click', () => showTeamModal());
     
     document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
