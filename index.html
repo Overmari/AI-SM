@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scrum Master Assistant — Flow Metrics + OpenRouter AI</title>
+    <title>Scrum Master Assistant — Flow Metrics + Groq AI</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
@@ -347,8 +347,8 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>🧠 Scrum Master Assistant — Flow Metrics + OpenRouter AI</h1>
-        <p>Flow Distribution · Flow Velocity · Flow Time · Flow Load · Flow Predictability · AI-аналитика через OpenRouter</p>
+        <h1>🧠 Scrum Master Assistant — Flow Metrics + Groq AI</h1>
+        <p>Flow Distribution · Flow Velocity · Flow Time · Flow Load · Flow Predictability · AI-аналитика от Groq (Llama 3.3)</p>
     </div>
 
     <div class="tabs">
@@ -380,8 +380,8 @@
 
     <div id="ai" class="panel">
         <div class="card">
-            <div class="card-header">🤖 AI-ассистент на базе OpenRouter</div>
-            <p style="margin-bottom: 16px; color: #475569;">OpenRouter анализирует ваши метрики через бесплатные модели (Gemini, Llama, Qwen).</p>
+            <div class="card-header">🤖 AI-ассистент на базе Groq (Llama 3.3)</div>
+            <p style="margin-bottom: 16px; color: #475569;">ИИ анализирует ваши метрики и даёт профессиональные рекомендации.</p>
             
             <div class="grid-5" style="margin-bottom: 20px;">
                 <button id="aiQuickMetricsBtn">📊 Анализ метрик</button>
@@ -792,10 +792,10 @@
         document.getElementById('recommendationsBlock').innerHTML = recHtml;
     }
 
-    // Функция для вызова OpenRouter API
-    async function callOpenRouterAPI(prompt, questionType, teamId) {
+    // === ФУНКЦИЯ ДЛЯ ВЫЗОВА GROQ API ===
+    async function callGroqAPI(prompt, questionType, teamId) {
         const responseDiv = document.getElementById('aiResponse');
-        responseDiv.innerHTML = '<div class="ai-loading"></div> OpenRouter анализирует...';
+        responseDiv.innerHTML = '<div class="ai-loading"></div> Groq анализирует...';
         
         let metrics = null;
         let teamName = '';
@@ -808,16 +808,16 @@
         }
         
         try {
-            const res = await fetch('/api/openrouter', {
+            const res = await fetch('/api/groq', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt, questionType, metrics, teamName, context: teamName ? `Команда: ${teamName}` : '' })
+                body: JSON.stringify({ prompt, questionType, metrics, teamName })
             });
             const data = await res.json();
             if (data.success) {
                 responseDiv.innerHTML = data.analysis.replace(/\n/g, '<br>');
             } else {
-                responseDiv.innerHTML = `❌ Ошибка: ${data.error || 'Неизвестная ошибка'}<br><br>Проверьте, что добавлен API-ключ OPENROUTER_API_KEY в настройках Vercel.`;
+                responseDiv.innerHTML = `❌ Ошибка: ${data.error || 'Неизвестная ошибка'}<br><br>Проверьте, что добавлен API-ключ GROQ_API_KEY в настройках Vercel.`;
             }
         } catch (error) {
             responseDiv.innerHTML = `❌ Ошибка соединения: ${error.message}`;
@@ -826,36 +826,36 @@
 
     document.getElementById('metricsTeamSelect')?.addEventListener('change', (e) => { if (e.target.value) showDetailedMetrics(e.target.value); else { document.getElementById('metricsDetails').innerHTML = ''; document.getElementById('recommendationsBlock').innerHTML = ''; destroyAllCharts(); document.getElementById('chartsContainer').innerHTML = ''; } });
     
-    // AI кнопки
+    // AI кнопки — обновлены для Groq
     document.getElementById('aiQuickMetricsBtn')?.addEventListener('click', () => {
         const teamId = document.getElementById('aiTeamSelect').value;
         if (!teamId) { alert('Выберите команду'); return; }
-        callOpenRouterAPI('', 'analyze', teamId);
+        callGroqAPI('', 'analyze', teamId);
     });
     
     document.getElementById('aiQuickBottleneckBtn')?.addEventListener('click', () => {
         const teamId = document.getElementById('aiTeamSelect').value;
         if (!teamId) { alert('Выберите команду'); return; }
-        callOpenRouterAPI('', 'bottleneck', teamId);
+        callGroqAPI('', 'bottleneck', teamId);
     });
     
     document.getElementById('aiQuickRetroBtn')?.addEventListener('click', () => {
         const teamId = document.getElementById('aiTeamSelect').value;
         if (!teamId) { alert('Выберите команду'); return; }
-        callOpenRouterAPI('', 'retro', teamId);
+        callGroqAPI('', 'retro', teamId);
     });
     
     document.getElementById('aiQuickPredictBtn')?.addEventListener('click', () => {
         const teamId = document.getElementById('aiTeamSelect').value;
         if (!teamId) { alert('Выберите команду'); return; }
-        callOpenRouterAPI('', 'predict', teamId);
+        callGroqAPI('', 'predict', teamId);
     });
     
     document.getElementById('aiSendBtn')?.addEventListener('click', () => {
         const prompt = document.getElementById('aiPrompt').value.trim();
         if (!prompt) { alert('Введите вопрос'); return; }
         const teamId = document.getElementById('aiTeamSelect').value;
-        callOpenRouterAPI(prompt, 'custom', teamId);
+        callGroqAPI(prompt, 'custom', teamId);
     });
     
     document.getElementById('aiClearBtn')?.addEventListener('click', () => {
